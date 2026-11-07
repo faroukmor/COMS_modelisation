@@ -1,0 +1,21 @@
+# ============================================================================
+# Charity Fund Management System - Database Configuration (Oracle)
+# ============================================================================
+# Copy this file to db.properties and fill in your Oracle connection details.
+# db.properties is git-ignored - never commit real credentials.
+# ============================================================================
+
+# Oracle JDBC connection URL (thin driver)
+# Format: jdbc:oracle:thin:@//HOST:PORT/SERVICE_NAME
+db.url=jdbc:oracle:thin:@//localhost:1521/ORCLPDB1
+
+# Database username
+db.username=charity_app
+
+# Database password (change this!)
+db.password=change_me
+
+# ----------------------------------------------------------------------------
+# Connection pool / performance hints (optional)
+# ----------------------------------------------------------------------------
+db.prefetch.rows=10

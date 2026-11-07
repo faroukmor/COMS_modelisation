@@ -53,3 +53,4 @@ Thumbs.db
 # Environment / secrets
 .env
 *.properties.bak
+db.properties
