@@ -182,4 +182,14 @@ public class OracleAidRequestDAO implements AidRequestDAO {
         r.setAdminNotes(rs.getString("admin_notes"));
         return r;
     }
+    @Override
+    public void update(AidRequest request, Connection con) {
+        try (PreparedStatement ps = con.prepareStatement(UPDATE)) {
+            bind(ps, request);
+            ps.setLong(12, request.getId());
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new RuntimeException("Error updating aid request in transaction id=" + request.getId(), e);
+        }
+    }
 }

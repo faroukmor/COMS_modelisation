@@ -117,4 +117,17 @@ public class OracleDistributionDAO implements DistributionDAO {
         d.setDescription(rs.getString("description"));
         return d;
     }
+    @Override
+    public Long save(Distribution distribution, Connection con) {
+        try (PreparedStatement ps = con.prepareStatement(INSERT, new String[]{"id"})) {
+            bind(ps, distribution);
+            ps.executeUpdate();
+            try (ResultSet rs = ps.getGeneratedKeys()) {
+                if (rs.next()) return rs.getLong(1);
+            }
+            throw new SQLException("Creating distribution failed, no ID obtained.");
+        } catch (SQLException e) {
+            throw new RuntimeException("Error saving distribution in transaction", e);
+        }
+    }
 }
