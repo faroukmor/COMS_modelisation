@@ -149,7 +149,7 @@ public class AidRequestView extends JPanel {
     }
 
     private void load() {
-        List<AidRequest> list = app.getRequestService() == null ? java.util.Collections.emptyList()
+        List<AidRequest> list = app.requestService == null ? java.util.Collections.emptyList()
                 : app.getRequestDAO().findAll();
         Object[][] data = new Object[list.size()][8];
         for (int i = 0; i < list.size(); i++) {
@@ -188,7 +188,7 @@ public class AidRequestView extends JPanel {
         try {
             Long beneficiaryId = Long.valueOf(txtBeneficiaryId.getText().trim());
             BigDecimal amount = new BigDecimal(txtRequested.getText().trim());
-            app.getRequestService().submitRequest(beneficiaryId, amount, txtDescription.getText().trim());
+            app.requestService.submitRequest(beneficiaryId, amount, txtDescription.getText().trim());
             txtBeneficiaryId.setText(""); txtRequested.setText(""); txtDescription.setText("");
             load();
             JOptionPane.showMessageDialog(this, "Aid request submitted.", "Success",
@@ -202,7 +202,7 @@ public class AidRequestView extends JPanel {
         try {
             Long id = Long.valueOf(txtReviewId.getText().trim());
             BigDecimal approved = new BigDecimal(txtApprovedAmount.getText().trim());
-            app.getRequestService().reviewRequest(id, status, app.getCurrentUser().getId(),
+            app.requestService.reviewRequest(id, status, app.getCurrentUser().getId(),
                     txtAdminNotes.getText().trim(), approved);
             clearReview();
             load();

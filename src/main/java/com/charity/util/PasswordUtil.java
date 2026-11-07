@@ -1,6 +1,7 @@
 package com.charity.util;
 
 import java.security.MessageDigest;
+import java.security.spec.InvalidKeySpecException;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.security.spec.KeySpec;
@@ -35,8 +36,8 @@ public final class PasswordUtil {
                     + Base64.getEncoder().encodeToString(hash);
         } catch (NoSuchAlgorithmException e) {
             throw new RuntimeException("PBKDF2 algorithm not available", e);
-        } catch (Exception e) {
-            throw new RuntimeException("Password hashing failed", e);
+        } catch (InvalidKeySpecException e) {
+            throw new RuntimeException("Invalid key specification", e);
         }
     }
 
@@ -55,13 +56,15 @@ public final class PasswordUtil {
             }
             int iterations = Integer.parseInt(parts[0].substring("pbkdf2:sha256:".length()));
             byte[] salt = Base64.getDecoder().decode(parts[1]);
-            byte[] expectedHash = Base64.getDecoder().decode(parts[2]);
+            byte[] hashBytes = Base64.getDecoder().decode(parts[2]);
 
             KeySpec spec = new PBEKeySpec(password.toCharArray(), salt, ITERATIONS, KEY_LENGTH);
             byte[] derivedKey = SecretKeyFactory.getInstance(ALGORITHM).generateSecret(spec).getEncoded();
-            return MessageDigest.isEqual(derivedKey, expectedHash);
-        } catch (IllegalArgumentException | IllegalStateException e) {
-            return false;
+            return MessageDigest.isEqual(derivedKey, hashBytes);
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException("PBKDF2 algorithm not available", e);
+        } catch (InvalidKeySpecException e) {
+            throw new RuntimeException("Invalid key specification", e);
         }
     }
 }
