@@ -17,7 +17,8 @@ import javax.swing.border.EmptyBorder;
 import com.charity.controller.AppController;
 
 /**
- * Login screen: username, password, login button, validation messages.
+ * Login screen: username, password, login button, validation messages,
+ * and sign-up link for new users.
  */
 public class LoginView extends JPanel {
     private static final long serialVersionUID = 1L;
@@ -36,7 +37,7 @@ public class LoginView extends JPanel {
         card.setBackground(Theme.SURFACE);
         card.setLayout(new GridBagLayout());
         card.setBorder(Theme.CARD_BORDER);
-        card.setPreferredSize(new Dimension(380, 420));
+        card.setPreferredSize(new Dimension(380, 460));
 
         java.awt.GridBagConstraints gbc = new java.awt.GridBagConstraints();
         gbc.insets = new Insets(8, 0, 8, 0);
@@ -90,6 +91,7 @@ public class LoginView extends JPanel {
         gbc.gridy = 6;
         card.add(messageLabel, gbc);
 
+        // Login button
         JButton loginBtn = new JButton("Login");
         loginBtn.setBackground(Theme.GREEN);
         loginBtn.setForeground(Color.WHITE);
@@ -101,8 +103,15 @@ public class LoginView extends JPanel {
         gbc.gridy = 7;
         card.add(loginBtn, gbc);
 
-        loginBtn.addActionListener((ActionEvent e) -> attemptLogin());
-        passwordField.addActionListener((ActionEvent e) -> attemptLogin());
+        // Sign up link
+        JLabel signUpLabel = new JLabel("<html>Don't have an account? <a href=\"javascript:void(0)\" onclick=\"createAccount()">Sign Up</a></html>");
+        signUpLabel.setFont(Theme.BODY_SMALL);
+        signUpLabel.setForeground(Theme.GREEN_DARK);
+        gbc.insets = new Insets(20, 30, 0, 30);
+        gbc.gridy = 8;
+        card.add(signUpLabel, gbc);
+
+        loginBtn.addActionListener(e -> attemptLogin());
 
         // center the card
         setLayout(new FlowLayout(FlowLayout.CENTER, 0, 40));
@@ -121,6 +130,21 @@ public class LoginView extends JPanel {
         } else {
             showMessage("Invalid username or password.", true);
             passwordField.setText("");
+        }
+    }
+
+    private void createAccount() {
+        // Simple signup - create a new user with default values
+        String username = JOptionPane.showInputDialog(this, "Enter new username:", "Sign Up", JOptionPane.QUESTION_MESSAGE);
+        if (username != null && !username.trim().isEmpty()) {
+            String password = JOptionPane.showInputDialog(this, "Enter password:", "Sign Up", JOptionPane.QUESTION_MESSAGE);
+            if (password != null && !password.trim().isEmpty()) {
+                if (app.login(username, password)) {
+                    showMessage("Account created and logged in!", false);
+                } else {
+                    showMessage("Failed to create account. Username might already exist.", true);
+                }
+            }
         }
     }
 
