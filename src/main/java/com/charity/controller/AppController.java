@@ -49,10 +49,18 @@ public class AppController {
     public final DonorService donorService = new DonorService(donorDAO);
     public final BeneficiaryService beneficiaryService = new BeneficiaryService(beneficiaryDAO);
     public final DonationService donationService = new DonationService(donationDAO, donorDAO);
-    public final AidRequestService requestService = new AidRequestService(requestDAO, beneficiaryDAO);
     public final DistributionService distributionService =
             new DistributionService(requestDAO, distributionDAO, donationDAO);
     public final FinancialService financialService = new FinancialService(donationDAO, distributionDAO);
+
+    private AidRequestService _requestService;
+
+    public AidRequestService getRequestService() {
+        if (_requestService == null) {
+            _requestService = new AidRequestService(requestDAO, beneficiaryDAO);
+        }
+        return _requestService;
+    }
 
     private MainFrame mainFrame;
     private User currentUser;

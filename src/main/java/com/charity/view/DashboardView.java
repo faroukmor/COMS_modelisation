@@ -35,12 +35,12 @@ public class DashboardView extends JPanel {
         this.app = app;
         setBackground(Theme.BG);
         setLayout(new BorderLayout(0, 16));
-        setBorder(new BorderFactory.EmptyBorder(0, 0, 0, 0));
+        setBorder(new EmptyBorder(0, 0, 0, 0));
 
         JLabel title = new JLabel("Administrator Dashboard");
         title.setFont(Theme.TITLE_FONT);
         title.setForeground(Theme.TEXT_DARK);
-        title.setBorder(new BorderFactory.EmptyBorder(0, 0, 14, 0));
+        title.setBorder(new EmptyBorder(0, 0, 14, 0));
         add(title, BorderLayout.NORTH);
 
         add(buildCards(), BorderLayout.CENTER);
@@ -52,7 +52,7 @@ public class DashboardView extends JPanel {
     private JPanel buildCards() {
         JPanel panel = new JPanel(new GridLayout(2, 3, 12, 12));
         panel.setBackground(Theme.BG);
-        panel.setBorder(new BorderFactory.EmptyBorder(0, 0, 14, 0));
+        panel.setBorder(new EmptyBorder(0, 0, 14, 0));
 
         lblConfirmed = valueLabel("0.00");
         lblDistributed = valueLabel("0.00");
@@ -109,7 +109,7 @@ public class DashboardView extends JPanel {
         JLabel title = new JLabel("Recent Activity");
         title.setFont(Theme.H2_FONT);
         title.setForeground(Theme.TEXT_DARK);
-        title.setBorder(new BorderFactory.EmptyBorder(0, 0, 10, 0));
+        title.setBorder(new EmptyBorder(0, 0, 10, 0));
         panel.add(title, BorderLayout.NORTH);
 
         JPanel tables = new JPanel(new GridLayout(1, 2, 12, 0));
@@ -134,7 +134,7 @@ public class DashboardView extends JPanel {
         JLabel t = new JLabel(title);
         t.setFont(Theme.H3_FONT);
         t.setForeground(Theme.TEXT_DARK);
-        t.setBorder(new BorderFactory.EmptyBorder(12, 12, 8, 12));
+        t.setBorder(new EmptyBorder(12, 12, 8, 12));
         panel.add(t, BorderLayout.NORTH);
 
         JTable table = TableHelper.createTable(columns);

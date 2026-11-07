@@ -1,5 +1,6 @@
 package com.charity.util;
 
+import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.security.spec.KeySpec;
 import java.util.Base64;
@@ -8,39 +9,42 @@ import javax.crypto.spec.PBEKeySpec;
 
 /**
  * Secure password hashing using PBKDF2WithHmacSHA256.
- * <p>
- * Produces an encoded string of the form:
- * {@code pbkdf2:sha256:<iterations>$<salt>$<hash>}
- * which can be stored directly in the database and verified later.
+ * Uses the standard Java JCA pattern for PBKDF2 password hashing.
  */
 public final class PasswordUtil {
     private static final String ALGORITHM = "PBKDF2WithHmacSHA256";
-    private static final int ITERATIONS = 250_000;
+    private static final int ITERATIONS = 655360;
     private static final int KEY_LENGTH = 256;
-    private static final SecureRandom RANDOM = new SecureRandom();
 
     private PasswordUtil() {
     }
 
     /**
      * Hashes a plain-text password with a random salt.
+     * @return Encoded hash string in the format: pbkdf2:sha256:<iterations>$<salt>$<hash>
      */
     public static String hash(String password) {
-        byte[] salt = new byte[16];
-        RANDOM.nextBytes(salt);
-        byte[] hash = deriveKey(password.toCharArray(), salt, ITERATIONS, KEY_LENGTH);
-        return "pbkdf2:sha256:" + ITERATIONS + "$"
-                + Base64.getEncoder().encodeToString(salt) + "$"
-                + Base64.getEncoder().encodeToString(hash);
+        try {
+            byte[] salt = new byte[16];
+            SecureRandom.getInstanceStrong().nextBytes(salt);
+            KeySpec spec = new PBEKeySpec(password.toCharArray(), salt, ITERATIONS, KEY_LENGTH);
+            byte[] hash = SecretKeyFactory.getInstance(ALGORITHM).generateSecret(spec).getEncoded();
+            return "pbkdf2:sha256:" + ITERATIONS + "$"
+                    + Base64.getEncoder().encodeToString(salt) + "$"
+                    + Base64.getEncoder().encodeToString(hash);
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException("PBKDF2 algorithm not available", e);
+        } catch (Exception e) {
+            throw new RuntimeException("Password hashing failed", e);
+        }
     }
 
     /**
      * Verifies a plain-text password against a stored hashed value.
-     *
      * @return {@code true} if the password matches, {@code false} otherwise
      */
     public static boolean verify(String password, String stored) {
-        if (password == null || stored == null || !stored.startsWith("pbkdf2:sha256:")) {
+        if (password == null || stored == null) {
             return false;
         }
         try {
@@ -51,31 +55,12 @@ public final class PasswordUtil {
             int iterations = Integer.parseInt(parts[0].substring("pbkdf2:sha256:".length()));
             byte[] salt = Base64.getDecoder().decode(parts[1]);
             byte[] expectedHash = Base64.getDecoder().decode(parts[2]);
-            byte[] actualHash = deriveKey(password.toCharArray(), salt, iterations, expectedHash.length);
-            return constantTimeEquals(actualHash, expectedHash);
-        } catch (IllegalArgumentException e) {
+
+            KeySpec spec = new PBEKeySpec(password.toCharArray(), salt, ITERATIONS, KEY_LENGTH);
+            byte[] derivedKey = SecretKeyFactory.getInstance(ALGORITHM).generateSecret(spec).getEncoded();
+            return MessageDigest.isEqual(derivedKey, expectedHash);
+        } catch (IllegalArgumentException | IllegalStateException e) {
             return false;
         }
-    }
-
-    private static byte[] deriveKey(char[] password, byte[] salt, int iterations, int keyLength) {
-        try {
-            KeySpec spec = new PBEKeySpec(password, salt, iterations, keyLength);
-            SecretKeyFactory factory = SecretKeyFactory.getInstance(ALGORITHM);
-            return factory.generateSecret(spec).getEncoded();
-        } catch (Exception e) {
-            throw new RuntimeException("PBKDF2 key derivation failed", e);
-        }
-    }
-
-    private static boolean constantTimeEquals(byte[] a, byte[] b) {
-        if (a.length != b.length) {
-            return false;
-        }
-        int result = 0;
-        for (int i = 0; i < a.length; i++) {
-            result |= a[i] ^ b[i];
-        }
-        return result == 0;
     }
 }

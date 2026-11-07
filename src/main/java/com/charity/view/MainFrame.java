@@ -9,6 +9,7 @@ import java.awt.Font;
 import java.awt.event.ActionListener;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
+import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JComponent;
 import javax.swing.JFrame;
@@ -128,10 +129,12 @@ public class MainFrame extends JFrame {
     }
 
     public void showView(String viewId, JComponent view) {
-        if (view != null && content.getComponent(viewId) == null) {
+        if (view != null) {
+            // Remove existing views and add the new one with constraint
+            content.removeAll();
             content.add(view, viewId);
+            cardLayout.show(content, viewId);
         }
-        cardLayout.show(content, viewId != null ? viewId : "login");
     }
 
     public JPanel getContent() {

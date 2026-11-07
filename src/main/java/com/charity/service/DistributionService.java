@@ -4,35 +4,56 @@ import com.charity.dao.AidRequestDAO;
 import com.charity.dao.DistributionDAO;
 import com.charity.dao.DonationDAO;
 import com.charity.database.DatabaseConnection;
+import com.charity.model.AidRequest;
 import com.charity.model.Distribution;
 import com.charity.model.PaymentMethod;
+import com.charity.model.RequestStatus;
 import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.function.Supplier;
 
 /**
  * Business logic for disbursing financial aid against approved requests.
  * <p>
- * All financial rules are enforced here and the distribution is performed inside a
- * database transaction so that either all changes commit or none do.
+ * All financial rules are enforced here using injected DAOs. The distribution is
+ * performed inside a database transaction so that either all changes commit or
+ * none do (rollback on failure). The {@link Connection} supplier is injectable
+ * so the business rules can be tested without a live database.
  */
 public class DistributionService {
     private final AidRequestDAO requestDAO;
     private final DistributionDAO distributionDAO;
     private final DonationDAO donationDAO;
+    private final Supplier<Connection> connectionSupplier;
 
     public DistributionService(AidRequestDAO requestDAO,
                                DistributionDAO distributionDAO,
                                DonationDAO donationDAO) {
+        this(requestDAO, distributionDAO, donationDAO, () -> {
+            try {
+                return DatabaseConnection.getConnection();
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
+        });
+    }
+
+    DistributionService(AidRequestDAO requestDAO,
+                        DistributionDAO distributionDAO,
+                        DonationDAO donationDAO,
+                        Supplier<Connection> connectionSupplier) {
         this.requestDAO = requestDAO;
         this.distributionDAO = distributionDAO;
         this.donationDAO = donationDAO;
+        this.connectionSupplier = connectionSupplier;
     }
 
     /**
      * Disburses financial aid against an approved request.
      *
      * @throws IllegalArgumentException if any business rule is violated
+     * @throws IllegalStateException    if the request is not approved
      */
     public Long disburse(Long requestId, BigDecimal amount, PaymentMethod paymentMethod,
                          String reference, String description) {
@@ -43,54 +64,52 @@ public class DistributionService {
             throw new IllegalArgumentException("Payment method is required");
         }
 
+        // Load and validate via injected DAO (no DB connection needed for validation)
+        AidRequest request = requestDAO.findById(requestId)
+                .orElseThrow(() -> new IllegalArgumentException("Aid request not found: " + requestId));
+        if (request.getStatus() != RequestStatus.APPROVED) {
+            throw new IllegalStateException("Only approved requests can receive a distribution");
+        }
+
+        // Rule: amount cannot exceed remaining approved amount
+        BigDecimal remaining = request.getApprovedAmount().subtract(request.getDistributedAmount());
+        if (amount.compareTo(remaining) > 0) {
+            throw new IllegalArgumentException(
+                    "Distribution amount exceeds remaining approved amount (" + remaining + ")");
+        }
+
+        // Rule: amount cannot exceed available fund balance
+        BigDecimal available = donationDAO.totalConfirmedAmount()
+                .subtract(distributionDAO.totalAmount());
+        if (available == null) {
+            available = BigDecimal.ZERO;
+        }
+        if (amount.compareTo(available) > 0) {
+            throw new IllegalArgumentException(
+                    "Distribution amount exceeds available fund balance (" + available + ")");
+        }
+
+        // Write phase: single transaction
         Connection con = null;
         try {
-            con = DatabaseConnection.getConnection();
+            con = connectionSupplier.get();
             con.setAutoCommit(false);
 
-            // Load the request within the transaction
-            AidRequestHolder holder = new AidRequestHolder();
-            loadRequest(con, requestId, holder);
-            if (holder.request.getStatus() != com.charity.model.RequestStatus.APPROVED) {
-                throw new IllegalStateException("Only approved requests can receive a distribution");
-            }
-
-            // Rule: amount cannot exceed remaining approved amount
-            BigDecimal remaining = holder.request.getApprovedAmount()
-                    .subtract(holder.request.getDistributedAmount());
-            if (amount.compareTo(remaining) > 0) {
-                throw new IllegalArgumentException(
-                        "Distribution amount exceeds remaining approved amount (" + remaining + ")");
-            }
-
-            // Rule: amount cannot exceed available fund balance
-            BigDecimal available = donationDAO.totalConfirmedAmount()
-                    .subtract(distributionDAO.totalAmount());
-            if (available == null) {
-                available = BigDecimal.ZERO;
-            }
-            if (amount.compareTo(available) > 0) {
-                throw new IllegalArgumentException(
-                        "Distribution amount exceeds available fund balance (" + available + ")");
-            }
-
-            // Create the distribution
             Distribution distribution = new Distribution();
             distribution.setAidRequestId(requestId);
-            distribution.setBeneficiaryId(holder.request.getBeneficiaryId());
+            distribution.setBeneficiaryId(request.getBeneficiaryId());
             distribution.setAmount(amount);
             distribution.setPaymentMethod(paymentMethod);
             distribution.setReference(reference);
             distribution.setDescription(description);
             Long distributionId = distributionDAO.save(distribution, con);
 
-            // Update the request's distributed amount
-            BigDecimal newDistributed = holder.request.getDistributedAmount().add(amount);
-            holder.request.setDistributedAmount(newDistributed);
-            if (newDistributed.compareTo(holder.request.getApprovedAmount()) >= 0) {
-                holder.request.setStatus(com.charity.model.RequestStatus.FULFILLED);
+            BigDecimal newDistributed = request.getDistributedAmount().add(amount);
+            request.setDistributedAmount(newDistributed);
+            if (newDistributed.compareTo(request.getApprovedAmount()) >= 0) {
+                request.setStatus(RequestStatus.FULFILLED);
             }
-            requestDAO.update(holder.request, con);
+            requestDAO.update(request, con);
 
             con.commit();
             return distributionId;
@@ -102,29 +121,6 @@ public class DistributionService {
             throw new RuntimeException("Database error during distribution", e);
         } finally {
             close(con);
-        }
-    }
-
-    private void loadRequest(Connection con, Long requestId, AidRequestHolder holder) throws SQLException {
-        try (java.sql.PreparedStatement ps = con.prepareStatement(
-                "SELECT id, beneficiary_id, beneficiary_type, requested_amount, approved_amount, "
-                + "distributed_amount, description, submission_date, status, reviewed_at, reviewed_by, admin_notes "
-                + "FROM aid_requests WHERE id = ?")) {
-            ps.setLong(1, requestId);
-            try (java.sql.ResultSet rs = ps.executeQuery()) {
-                if (!rs.next()) {
-                    throw new IllegalArgumentException("Aid request not found: " + requestId);
-                }
-                com.charity.model.AidRequest r = new com.charity.model.AidRequest();
-                r.setId(rs.getLong("id"));
-                r.setBeneficiaryId(rs.getLong("beneficiary_id"));
-                r.setBeneficiaryType(com.charity.model.BeneficiaryType.valueOf(rs.getString("beneficiary_type")));
-                r.setRequestedAmount(rs.getBigDecimal("requested_amount"));
-                r.setApprovedAmount(rs.getBigDecimal("approved_amount"));
-                r.setDistributedAmount(rs.getBigDecimal("distributed_amount"));
-                r.setStatus(com.charity.model.RequestStatus.valueOf(rs.getString("status")));
-                holder.request = r;
-            }
         }
     }
 
@@ -144,9 +140,5 @@ public class DistributionService {
             } catch (SQLException ignored) {
             }
         }
-    }
-
-    private static final class AidRequestHolder {
-        com.charity.model.AidRequest request;
     }
 }
