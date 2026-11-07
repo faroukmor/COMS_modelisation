@@ -22,5 +22,6 @@ public interface AidRequestDAO {
     void setApprovedAmount(Long id, BigDecimal approvedAmount);
     List<AidRequest> findByBeneficiary(Long beneficiaryId);
     List<AidRequest> findByStatus(RequestStatus status);
+    int countByStatus(RequestStatus status);
     BigDecimal totalDistributedByRequest(Long requestId);
 }

@@ -25,6 +25,7 @@ public class OracleAidRequestDAO implements AidRequestDAO {
     private static final String SET_APPROVED_AMOUNT = "UPDATE aid_requests SET approved_amount = ? WHERE id = ?";
     private static final String FIND_BY_BENEFICIARY = "SELECT id, beneficiary_id, beneficiary_type, requested_amount, approved_amount, distributed_amount, description, submission_date, status, reviewed_at, reviewed_by, admin_notes FROM aid_requests WHERE beneficiary_id = ? ORDER BY submission_date DESC";
     private static final String FIND_BY_STATUS = "SELECT id, beneficiary_id, beneficiary_type, requested_amount, approved_amount, distributed_amount, description, submission_date, status, reviewed_at, reviewed_by, admin_notes FROM aid_requests WHERE status = ? ORDER BY submission_date DESC";
+    private static final String COUNT_BY_STATUS = "SELECT COUNT(*) FROM aid_requests WHERE status = ?";
     private static final String TOTAL_DISTRIBUTED_BY_REQUEST = "SELECT NVL(SUM(distributed_amount), 0) FROM aid_requests WHERE id = ?";
 
     @Override
@@ -134,6 +135,20 @@ public class OracleAidRequestDAO implements AidRequestDAO {
             throw new RuntimeException("Error finding aid requests by status", e);
         }
         return list;
+    }
+
+    @Override
+    public int countByStatus(RequestStatus status) {
+        try (Connection con = DatabaseConnection.getConnection();
+             PreparedStatement ps = con.prepareStatement(COUNT_BY_STATUS)) {
+            ps.setString(1, status.name());
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return rs.getInt(1);
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Error counting aid requests by status", e);
+        }
+        return 0;
     }
 
     @Override
