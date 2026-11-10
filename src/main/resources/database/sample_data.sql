@@ -4,7 +4,7 @@
 -- Includes:
 --   - Default administrator account
 --   - Sample donors, beneficiaries, donations, aid requests, distributions
--- Password for admin: Admin123  (hashed with PBKDF2WithHmacSHA256)
+-- Password for admin: Admin123  (hashed with PBKDF2WithHmacSHA256, 655360 iterations)
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
@@ -14,7 +14,7 @@
 INSERT INTO users (username, password_hash, role, full_name, email, phone)
 VALUES (
     'admin',
-    'pbkdf2:sha256:250000$Zm9vYmFy$d4f3e2c1b0a9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c3b2a1f0e9d8c7b6a5f4e3',
+    'pbkdf2:sha256:655360$xvzkdecQvB987pxlv7RmdQ==$3w1dddvYrvRl38uXCXUbE6A2G1nv/iOClGZwwSwdTc0=',
     'ADMIN',
     'System Administrator',
     'admin@charity.org',
@@ -31,6 +31,7 @@ INSERT INTO donors (full_name, email, phone, address, total_donated)
 VALUES ('Fatima Zohra', 'fatima.z@email.com', '+213 550 789 012', 'Oran, Algeria', 30000.00);
 
 INSERT INTO donors (full_name, email, phone, address, total_donated)
+VALUES ('Karim Mansouri', 'karim.m@email.com', '+213 560 345 678', 'Constantine, Algeria', 20000.00);
 
 -- ----------------------------------------------------------------------------
 -- Sample beneficiaries (individuals)
@@ -106,4 +107,4 @@ VALUES (2, 2, 10000.00, TIMESTAMP '2025-11-11 11:00:00', 'CASH', 'DIST-2025-002'
 -- End of sample data
 -- ============================================================================
 
-VALUES ('Karim Mansouri', 'karim.m@email.com', '+213 560 345 678', 'Constantine, Algeria', 20000.00);
+COMMIT;
