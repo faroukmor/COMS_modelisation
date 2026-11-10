@@ -8,6 +8,8 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -17,7 +19,7 @@ public class OracleUserDAO implements UserDAO {
 
     private static final String FIND_BY_USERNAME =
             "SELECT id, username, password_hash, role, full_name, email, phone, created_at "
-            + "FROM users WHERE username = ?";
+            + "FROM users WHERE LOWER(username) = LOWER(?)";
 
     private static final String INSERT =
             "INSERT INTO users (username, password_hash, role, full_name, email, phone, created_at) "
@@ -28,7 +30,14 @@ public class OracleUserDAO implements UserDAO {
             + "WHERE id = ?";
 
     private static final String EXISTS =
-            "SELECT 1 FROM users WHERE username = ?";
+            "SELECT 1 FROM users WHERE LOWER(username) = LOWER(?)";
+
+    private static final String EMAIL_EXISTS =
+            "SELECT 1 FROM users WHERE LOWER(email) = LOWER(?)";
+
+    private static final String FIND_ALL =
+            "SELECT id, username, password_hash, role, full_name, email, phone, created_at "
+            + "FROM users ORDER BY id";
 
     @Override
     public Optional<User> findByUsername(String username) {
@@ -49,7 +58,7 @@ public class OracleUserDAO implements UserDAO {
     @Override
     public Long save(User user) {
         try (Connection con = DatabaseConnection.getConnection();
-             PreparedStatement ps = con.prepareStatement(INSERT, new String[]{"id"})) {
+             PreparedStatement ps = con.prepareStatement(INSERT, new String[]{"ID"})) {
             ps.setString(1, user.getUsername());
             ps.setString(2, user.getPasswordHash());
             ps.setString(3, user.getRole().name());
@@ -101,6 +110,37 @@ public class OracleUserDAO implements UserDAO {
         } catch (SQLException e) {
             throw new RuntimeException("Error checking user existence", e);
         }
+    }
+
+    @Override
+    public boolean emailExists(String email) {
+        if (email == null || email.isBlank()) {
+            return false;
+        }
+        try (Connection con = DatabaseConnection.getConnection();
+             PreparedStatement ps = con.prepareStatement(EMAIL_EXISTS)) {
+            ps.setString(1, email.trim());
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next();
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Error checking e-mail existence", e);
+        }
+    }
+
+    @Override
+    public List<User> findAll() {
+        List<User> list = new ArrayList<>();
+        try (Connection con = DatabaseConnection.getConnection();
+             PreparedStatement ps = con.prepareStatement(FIND_ALL);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                list.add(map(rs));
+            }
+        } catch (SQLException e) {
+            throw new RuntimeException("Error listing users", e);
+        }
+        return list;
     }
 
     private User map(ResultSet rs) throws SQLException {

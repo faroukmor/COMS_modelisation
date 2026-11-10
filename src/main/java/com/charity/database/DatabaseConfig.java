@@ -14,23 +14,20 @@ import java.util.Properties;
 public final class DatabaseConfig {
     private static final Properties PROPS = new Properties();
 
+    private static final boolean FILE_FOUND;
+
     static {
+        boolean found = false;
         try (InputStream is = DatabaseConfig.class.getClassLoader()
                 .getResourceAsStream("db.properties")) {
             if (is != null) {
                 PROPS.load(is);
-            } else {
-                // Fall back to the example file for development guidance only.
-                try (InputStream ex = DatabaseConfig.class.getClassLoader()
-                        .getResourceAsStream("db.properties.example")) {
-                    if (ex != null) {
-                        PROPS.load(ex);
-                    }
-                }
+                found = true;
             }
         } catch (IOException e) {
             throw new RuntimeException("Unable to load database configuration", e);
         }
+        FILE_FOUND = found;
     }
 
     private DatabaseConfig() {
@@ -49,11 +46,30 @@ public final class DatabaseConfig {
     }
 
     public static String get(String key, String defaultValue) {
+        return lookup(key, defaultValue);
+    }
+
+    /**
+     * Resolves a property. JVM system properties ({@code -Ddb.url=...}) take precedence over
+     * {@code db.properties}, which lets tests and CI point the application at another database.
+     */
+    private static String lookup(String key, String defaultValue) {
+        String override = System.getProperty(key);
+        if (override != null) {
+            return override;
+        }
         return PROPS.getProperty(key, defaultValue);
     }
 
     private static String getRequired(String key) {
-        String value = PROPS.getProperty(key);
+        String value = lookup(key, null);
+        if (value == null && !FILE_FOUND) {
+            // Do NOT silently fall back to the example file: its values are placeholders and the
+            // resulting "connection refused" error would point at the wrong problem.
+            throw new IllegalStateException("db.properties was not found. Copy "
+                    + "src/main/resources/db.properties.example to src/main/resources/db.properties, "
+                    + "enter your Oracle URL, username and password, then rebuild and run again.");
+        }
         if (value == null || value.trim().isEmpty()) {
             throw new IllegalStateException("Missing required database property: " + key);
         }

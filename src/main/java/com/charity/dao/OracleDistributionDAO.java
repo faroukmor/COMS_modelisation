@@ -48,7 +48,7 @@ public class OracleDistributionDAO implements DistributionDAO {
 
     @Override
     public Long save(Distribution distribution) {
-        try (Connection con = DatabaseConnection.getConnection(); PreparedStatement ps = con.prepareStatement(INSERT, new String[]{"id"})) {
+        try (Connection con = DatabaseConnection.getConnection(); PreparedStatement ps = con.prepareStatement(INSERT, new String[]{"ID"})) {
             bind(ps, distribution);
             ps.executeUpdate();
             try (ResultSet rs = ps.getGeneratedKeys()) {
@@ -66,7 +66,7 @@ public class OracleDistributionDAO implements DistributionDAO {
             ps.setLong(1, id);
             ps.executeUpdate();
         } catch (SQLException e) {
-            throw new RuntimeException("Error deleting distribution id=" + id, e);
+            throw DaoSupport.deleteFailure("distribution", id, e);
         }
     }
 
@@ -119,7 +119,7 @@ public class OracleDistributionDAO implements DistributionDAO {
     }
     @Override
     public Long save(Distribution distribution, Connection con) {
-        try (PreparedStatement ps = con.prepareStatement(INSERT, new String[]{"id"})) {
+        try (PreparedStatement ps = con.prepareStatement(INSERT, new String[]{"ID"})) {
             bind(ps, distribution);
             ps.executeUpdate();
             try (ResultSet rs = ps.getGeneratedKeys()) {

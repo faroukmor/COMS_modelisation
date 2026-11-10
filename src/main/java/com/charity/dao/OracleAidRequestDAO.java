@@ -54,7 +54,7 @@ public class OracleAidRequestDAO implements AidRequestDAO {
 
     @Override
     public Long save(AidRequest request) {
-        try (Connection con = DatabaseConnection.getConnection(); PreparedStatement ps = con.prepareStatement(INSERT, new String[]{"id"})) {
+        try (Connection con = DatabaseConnection.getConnection(); PreparedStatement ps = con.prepareStatement(INSERT, new String[]{"ID"})) {
             bind(ps, request);
             ps.executeUpdate();
             try (ResultSet rs = ps.getGeneratedKeys()) {
@@ -83,7 +83,7 @@ public class OracleAidRequestDAO implements AidRequestDAO {
             ps.setLong(1, id);
             ps.executeUpdate();
         } catch (SQLException e) {
-            throw new RuntimeException("Error deleting aid request id=" + id, e);
+            throw DaoSupport.deleteFailure("aid request", id, e);
         }
     }
 
@@ -174,7 +174,11 @@ public class OracleAidRequestDAO implements AidRequestDAO {
         ps.setTimestamp(7, r.getSubmissionDate() != null ? Timestamp.valueOf(r.getSubmissionDate()) : null);
         ps.setString(8, r.getStatus().name());
         ps.setTimestamp(9, r.getReviewedAt() != null ? Timestamp.valueOf(r.getReviewedAt()) : null);
-        ps.setLong(10, r.getReviewedBy() == null ? 0 : r.getReviewedBy());
+        if (r.getReviewedBy() == null) {
+            ps.setNull(10, java.sql.Types.NUMERIC);
+        } else {
+            ps.setLong(10, r.getReviewedBy());
+        }
         ps.setString(11, r.getAdminNotes());
     }
 

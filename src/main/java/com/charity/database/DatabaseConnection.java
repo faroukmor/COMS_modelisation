@@ -11,14 +11,6 @@ import java.sql.SQLException;
  * Callers are responsible for closing the connection (use try-with-resources).
  */
 public final class DatabaseConnection {
-    static {
-        try {
-            Class.forName("oracle.jdbc.OracleDriver");
-        } catch (ClassNotFoundException e) {
-            throw new RuntimeException("Oracle JDBC driver not found on classpath", e);
-        }
-    }
-
     private DatabaseConnection() {
     }
 
@@ -26,8 +18,17 @@ public final class DatabaseConnection {
      * Opens a new connection to the Oracle database using configured credentials.
      */
     public static Connection getConnection() throws SQLException {
+        String url = DatabaseConfig.getUrl();
+        if (url.startsWith("jdbc:oracle:")) {
+            // JDBC 4 drivers self-register; this only produces a clearer error if ojdbc is missing.
+            try {
+                Class.forName("oracle.jdbc.OracleDriver");
+            } catch (ClassNotFoundException e) {
+                throw new SQLException("Oracle JDBC driver (ojdbc) not found on the classpath", e);
+            }
+        }
         return DriverManager.getConnection(
-                DatabaseConfig.getUrl(),
+                url,
                 DatabaseConfig.getUsername(),
                 DatabaseConfig.getPassword());
     }

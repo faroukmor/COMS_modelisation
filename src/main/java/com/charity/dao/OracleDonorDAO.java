@@ -61,7 +61,7 @@ public class OracleDonorDAO implements DonorDAO {
     @Override
     public Long save(Donor donor) {
         try (Connection con = DatabaseConnection.getConnection();
-             PreparedStatement ps = con.prepareStatement(INSERT, new String[]{"id"})) {
+             PreparedStatement ps = con.prepareStatement(INSERT, new String[]{"ID"})) {
             ps.setString(1, donor.getFullName());
             ps.setString(2, donor.getEmail());
             ps.setString(3, donor.getPhone());
@@ -102,14 +102,17 @@ public class OracleDonorDAO implements DonorDAO {
             ps.setLong(1, id);
             ps.executeUpdate();
         } catch (SQLException e) {
-            throw new RuntimeException("Error deleting donor id=" + id, e);
+            throw DaoSupport.deleteFailure("donor", id, e);
         }
     }
 
     @Override
     public List<Donor> search(String keyword) {
+        if (keyword == null || keyword.isBlank()) {
+            return findAll();
+        }
         List<Donor> list = new ArrayList<>();
-        String like = "%" + keyword.toLowerCase() + "%";
+        String like = "%" + keyword.trim().toLowerCase() + "%";
         try (Connection con = DatabaseConnection.getConnection();
              PreparedStatement ps = con.prepareStatement(SEARCH)) {
             ps.setString(1, like);

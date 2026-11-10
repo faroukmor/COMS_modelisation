@@ -50,8 +50,10 @@ public class OracleBeneficiaryDAO implements BeneficiaryDAO {
 
     @Override
     public Long save(Beneficiary beneficiary) {
-        try (Connection con = DatabaseConnection.getConnection(); PreparedStatement ps = con.prepareStatement(INSERT, new String[]{"id"})) {
+        try (Connection con = DatabaseConnection.getConnection(); PreparedStatement ps = con.prepareStatement(INSERT, new String[]{"ID"})) {
             bind(ps, beneficiary);
+            ps.setTimestamp(10, beneficiary.getCreatedAt() != null
+                    ? Timestamp.valueOf(beneficiary.getCreatedAt()) : null);
             ps.executeUpdate();
             try (ResultSet rs = ps.getGeneratedKeys()) {
                 if (rs.next()) return rs.getLong(1);
@@ -79,14 +81,17 @@ public class OracleBeneficiaryDAO implements BeneficiaryDAO {
             ps.setLong(1, id);
             ps.executeUpdate();
         } catch (SQLException e) {
-            throw new RuntimeException("Error deleting beneficiary id=" + id, e);
+            throw DaoSupport.deleteFailure("beneficiary", id, e);
         }
     }
 
     @Override
     public List<Beneficiary> search(String keyword) {
+        if (keyword == null || keyword.isBlank()) {
+            return findAll();
+        }
         List<Beneficiary> list = new ArrayList<>();
-        String like = "%" + keyword.toLowerCase() + "%";
+        String like = "%" + keyword.trim().toLowerCase() + "%";
         try (Connection con = DatabaseConnection.getConnection(); PreparedStatement ps = con.prepareStatement(SEARCH)) {
             ps.setString(1, like);
             ps.setString(2, like);
@@ -124,7 +129,6 @@ public class OracleBeneficiaryDAO implements BeneficiaryDAO {
         ps.setString(7, b.getEmail());
         ps.setString(8, b.getPhone());
         ps.setString(9, b.getAddress());
-        ps.setTimestamp(10, b.getCreatedAt() != null ? Timestamp.valueOf(b.getCreatedAt()) : null);
     }
 
     private Beneficiary map(ResultSet rs) throws SQLException {

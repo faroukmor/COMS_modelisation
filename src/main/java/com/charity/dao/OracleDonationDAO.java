@@ -52,7 +52,7 @@ public class OracleDonationDAO implements DonationDAO {
 
     @Override
     public Long save(Donation donation) {
-        try (Connection con = DatabaseConnection.getConnection(); PreparedStatement ps = con.prepareStatement(INSERT, new String[]{"id"})) {
+        try (Connection con = DatabaseConnection.getConnection(); PreparedStatement ps = con.prepareStatement(INSERT, new String[]{"ID"})) {
             bind(ps, donation);
             ps.executeUpdate();
             try (ResultSet rs = ps.getGeneratedKeys()) {
@@ -81,7 +81,7 @@ public class OracleDonationDAO implements DonationDAO {
             ps.setLong(1, id);
             ps.executeUpdate();
         } catch (SQLException e) {
-            throw new RuntimeException("Error deleting donation id=" + id, e);
+            throw DaoSupport.deleteFailure("donation", id, e);
         }
     }
 
