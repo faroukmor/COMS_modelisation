@@ -1,238 +1,149 @@
 package com.charity.view;
 
+import com.charity.controller.AppController;
+import com.charity.model.Donor;
 import java.awt.BorderLayout;
-import java.awt.Color;
-import java.awt.Dimension;
-import java.awt.FlowLayout;
-import java.awt.GridLayout;
-import java.awt.event.ActionEvent;
-import java.util.List;
-import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
-import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.JTextField;
-import javax.swing.border.EmptyBorder;
-import com.charity.controller.AppController;
-import com.charity.model.Donor;
 
 /**
- * Donor management: register, update, delete, search donors.
+ * Donor management: add, edit, delete and filter donors.
  */
-public class DonorView extends JPanel {
+public class DonorView extends BaseView {
     private static final long serialVersionUID = 1L;
-    private final AppController app;
     private final JTable table = TableHelper.createTable(
-            new String[]{"ID", "Full Name", "Email", "Phone", "Address", "Total Donated"});
-    private final JTextField txtName = new JTextField();
-    private final JTextField txtEmail = new JTextField();
-    private final JTextField txtPhone = new JTextField();
-    private final JTextField txtAddress = new JTextField();
-    private final JTextField txtSearch = new JTextField();
+            new String[]{"ID", "Full name", "Email", "Phone", "Address", "Donated"});
+    private final JTextField txtName = UI.styleField(new JTextField());
+    private final JTextField txtEmail = UI.styleField(new JTextField(), "name@example.com");
+    private final JTextField txtPhone = UI.styleField(new JTextField());
+    private final JTextField txtAddress = UI.styleField(new JTextField());
+    private final JTextField txtSearch = UI.searchField("Search donors...");
+    private final JLabel formTitle = cardTitle("Add donor");
+    private final JButton btnSave = UI.button("Add donor", UI.Style.PRIMARY, Icons.Kind.PLUS);
+    private final JButton btnDelete = UI.button("Delete", UI.Style.DANGER, Icons.Kind.TRASH);
+    private final JButton btnClear = UI.button("Clear", UI.Style.SECONDARY);
     private Long editingId = null;
 
     public DonorView(AppController app) {
-        this.app = app;
-        setBackground(Theme.BG);
-        setLayout(new BorderLayout(0, 10));
-        setBorder(new EmptyBorder(16, 16, 16, 16));
+        super(app);
+        add(UI.pageHeader("Donors", "People and organisations who give to the fund.", txtSearch), BorderLayout.NORTH);
 
-        add(buildForm(), BorderLayout.NORTH);
-        add(buildTable(), BorderLayout.CENTER);
+        TableHelper.attachFilter(table, txtSearch);
+        UI.Card list = TableHelper.tableCard("All donors", table, null);
+
+        UI.FormGrid form = new UI.FormGrid(1);
+        form.add("Full name", txtName);
+        form.add("Email", txtEmail);
+        form.add("Phone", txtPhone);
+        form.add("Address", txtAddress);
+        JPanel body = new JPanel(new BorderLayout());
+        body.setOpaque(false);
+        body.add(form, BorderLayout.NORTH);
+        JPanel buttons = UI.buttonRow(btnSave, btnDelete, btnClear);
+        add(masterDetail(list, formCard(formTitle, body, buttons), 390), BorderLayout.CENTER);
+
+        btnDelete.setEnabled(false);
+        btnSave.addActionListener(e -> onSave());
+        btnDelete.addActionListener(e -> onDelete());
+        btnClear.addActionListener(e -> clearForm());
+        table.getSelectionModel().addListSelectionListener(e -> {
+            if (!e.getValueIsAdjusting()) {
+                onRowSelected(table.getSelectedRow());
+            }
+        });
         load();
     }
 
-    private JPanel buildForm() {
-        JPanel outer = new JPanel(new BorderLayout());
-        outer.setBackground(Theme.BG);
-        outer.setBorder(new EmptyBorder(0, 0, 10, 0));
-
-        JLabel title = new JLabel("Manage Donors");
-        title.setFont(Theme.H2_FONT);
-        title.setForeground(Theme.TEXT_DARK);
-        outer.add(title, BorderLayout.NORTH);
-
-        JPanel form = new JPanel(new GridLayout(2, 6, 8, 8));
-        form.setBackground(Theme.SURFACE);
-        form.setBorder(Theme.CARD_BORDER);
-
-        txtName.setPreferredSize(new Dimension(160, 40));
-        txtEmail.setPreferredSize(new Dimension(160, 40));
-        txtPhone.setPreferredSize(new Dimension(120, 40));
-        txtAddress.setPreferredSize(new Dimension(200, 40));
-        txtSearch.setPreferredSize(new Dimension(160, 40));
-
-        form.add(field("Full Name", txtName));
-        form.add(field("Email", txtEmail));
-        form.add(field("Phone", txtPhone));
-        form.add(field("Address", txtAddress));
-        form.add(field("Search", txtSearch));
-
-        JPanel btns = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
-        btns.setBackground(Theme.SURFACE);
-        JButton btnAdd = button("Add", Theme.GREEN);
-        JButton btnUpdate = button("Update", Theme.BLUE);
-        JButton btnDelete = button("Delete", Theme.RED);
-        JButton btnClear = button("Clear", Theme.TEXT_MUTED);
-        JButton btnSearch = button("Search", Theme.GREEN_DARK);
-        btnAdd.addActionListener(e -> onAdd());
-        btnUpdate.addActionListener(e -> onUpdate());
-        btnDelete.addActionListener(e -> onDelete());
-        btnClear.addActionListener(e -> clearForm());
-        btnSearch.addActionListener(e -> onSearch());
-        btns.add(btnAdd); btns.add(btnUpdate); btns.add(btnDelete);
-        btns.add(btnClear); btns.add(btnSearch);
-
-        table.getSelectionModel().addListSelectionListener(e -> {
-            if (!e.getValueIsAdjusting()) onRowSelected(table.getSelectedRow());
-        });
-
-        outer.add(form, BorderLayout.CENTER);
-        return outer;
-    }
-
-    private JPanel field(String label, JTextField f) {
-        JPanel p = new JPanel(new BorderLayout(4, 4));
-        p.setBackground(Theme.SURFACE);
-        p.setBorder(new EmptyBorder(4, 4, 4, 4));
-        JLabel l = new JLabel(label);
-        l.setFont(Theme.BODY_SMALL);
-        l.setForeground(Theme.TEXT_MUTED);
-        p.add(l, BorderLayout.NORTH);
-        p.add(f, BorderLayout.CENTER);
-        return p;
-    }
-
-    private JButton button(String label, Color color) {
-        JButton b = new JButton(label);
-        b.setBackground(color);
-        b.setForeground(Color.WHITE);
-        b.setFont(Theme.BUTTON_FONT);
-        b.setFocusPainted(false);
-        b.setBorder(new EmptyBorder(8, 14, 8, 14));
-        return b;
-    }
-
-    private JPanel buildTable() {
-        JPanel outer = new JPanel(new BorderLayout());
-        outer.setBackground(Theme.BG);
-        outer.setBorder(new EmptyBorder(0, 0, 0, 0));
-
-        JLabel title = new JLabel("Donors");
-        title.setFont(Theme.H3_FONT);
-        title.setForeground(Theme.TEXT_DARK);
-        title.setBorder(new EmptyBorder(8, 0, 4, 0));
-        outer.add(title, BorderLayout.NORTH);
-
-        JScrollPane scroll = new JScrollPane(table);
-        scroll.getViewport().setBackground(Theme.SURFACE);
-        outer.add(scroll, BorderLayout.CENTER);
-        return outer;
-    }
-
     private void load() {
-        List<Donor> list = app.donorService.findAll();
-        Object[][] data = new Object[list.size()][6];
-        for (int i = 0; i < list.size(); i++) {
-            Donor d = list.get(i);
-            data[i][0] = d.getId();
-            data[i][1] = d.getFullName();
-            data[i][2] = d.getEmail();
-            data[i][3] = d.getPhone();
-            data[i][4] = d.getAddress();
-            data[i][5] = themeMoney(d.getTotalDonated());
-        }
-        TableHelper.setData(table, data);
+        async(app.donorService::findAll, list -> {
+            Object[][] data = new Object[list.size()][];
+            for (int i = 0; i < list.size(); i++) {
+                Donor d = list.get(i);
+                data[i] = new Object[]{d.getId(), d.getFullName(), d.getEmail(), d.getPhone(), d.getAddress(),
+                        d.getTotalDonated()};
+            }
+            TableHelper.setData(table, data);
+        });
     }
 
-    private String themeMoney(java.math.BigDecimal v) {
-        return v == null ? "0.00" : v.toString();
+    private Donor fromForm() {
+        Donor d = new Donor();
+        d.setId(editingId);
+        d.setFullName(txtName.getText());
+        d.setEmail(txtEmail.getText());
+        d.setPhone(txtPhone.getText());
+        d.setAddress(txtAddress.getText());
+        return d;
     }
 
-    private void clearForm() {
-        txtName.setText(""); txtEmail.setText(""); txtPhone.setText(""); txtAddress.setText("");
-        editingId = null;
-    }
-
-    // ---- Actions wired via controller ----
-    void onAdd() {
-        try {
-            Donor d = new Donor();
-            d.setFullName(txtName.getText().trim());
-            d.setEmail(txtEmail.getText().trim());
-            d.setPhone(txtPhone.getText().trim());
-            d.setAddress(txtAddress.getText().trim());
-            app.donorService.create(d);
+    void onSave() {
+        Donor d = fromForm();
+        boolean creating = editingId == null;
+        async(() -> {
+            if (creating) {
+                app.donorService.create(d);
+            } else {
+                app.donorService.update(d);
+            }
+            return Boolean.TRUE;
+        }, ok -> {
+            toast(creating ? "Donor added." : "Donor updated.");
             clearForm();
             load();
-            JOptionPane.showMessageDialog(this, "Donor added successfully.", "Success",
-                    JOptionPane.INFORMATION_MESSAGE);
-        } catch (Exception ex) {
-            JOptionPane.showMessageDialog(this, ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
-        }
-    }
-
-    void onUpdate() {
-        if (editingId == null) {
-            JOptionPane.showMessageDialog(this, "Select a donor to update.", "Info",
-                    JOptionPane.INFORMATION_MESSAGE);
-            return;
-        }
-        try {
-            Donor d = new Donor();
-            d.setId(editingId);
-            d.setFullName(txtName.getText().trim());
-            d.setEmail(txtEmail.getText().trim());
-            d.setPhone(txtPhone.getText().trim());
-            d.setAddress(txtAddress.getText().trim());
-            app.donorService.update(d);
-            clearForm();
-            load();
-            JOptionPane.showMessageDialog(this, "Donor updated successfully.", "Success",
-                    JOptionPane.INFORMATION_MESSAGE);
-        } catch (Exception ex) {
-            JOptionPane.showMessageDialog(this, ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
-        }
+        });
     }
 
     void onDelete() {
-        if (editingId == null) return;
-        int confirm = JOptionPane.showConfirmDialog(this,
-                "Delete this donor? This cannot be undone.", "Confirm Delete",
-                JOptionPane.YES_NO_OPTION);
-        if (confirm == JOptionPane.YES_OPTION) {
-            try {
-                app.donorService.delete(editingId);
-                clearForm();
-                load();
-            } catch (Exception ex) {
-                JOptionPane.showMessageDialog(this, ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
-            }
+        if (editingId == null) {
+            return;
         }
+        int confirm = JOptionPane.showConfirmDialog(this, "Delete this donor? This cannot be undone.",
+                "Confirm delete", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+        if (confirm != JOptionPane.YES_OPTION) {
+            return;
+        }
+        Long id = editingId;
+        async(() -> {
+            app.donorService.delete(id);
+            return Boolean.TRUE;
+        }, ok -> {
+            toast("Donor deleted.");
+            clearForm();
+            load();
+        });
     }
 
     void onRowSelected(int row) {
-        if (row < 0) return;
-        editingId = Long.valueOf(table.getValueAt(row, 0).toString());
-        txtName.setText(table.getValueAt(row, 1) == null ? "" : table.getValueAt(row, 1).toString());
-        txtEmail.setText(table.getValueAt(row, 2) == null ? "" : table.getValueAt(row, 2).toString());
-        txtPhone.setText(table.getValueAt(row, 3) == null ? "" : table.getValueAt(row, 3).toString());
-        txtAddress.setText(table.getValueAt(row, 4) == null ? "" : table.getValueAt(row, 4).toString());
+        if (row < 0) {
+            return;
+        }
+        editingId = (Long) table.getValueAt(row, 0);
+        txtName.setText(text(table.getValueAt(row, 1)));
+        txtEmail.setText(text(table.getValueAt(row, 2)));
+        txtPhone.setText(text(table.getValueAt(row, 3)));
+        txtAddress.setText(text(table.getValueAt(row, 4)));
+        formTitle.setText("Edit donor #" + editingId);
+        btnSave.setText("Save changes");
+        btnDelete.setEnabled(true);
     }
 
-    void onSearch() {
-        String kw = txtSearch.getText().trim();
-        List<Donor> list = kw.isEmpty() ? app.donorService.findAll() : app.donorService.search(kw);
-        Object[][] data = new Object[list.size()][6];
-        for (int i = 0; i < list.size(); i++) {
-            Donor d = list.get(i);
-            data[i][0] = d.getId(); data[i][1] = d.getFullName();
-            data[i][2] = d.getEmail(); data[i][3] = d.getPhone();
-            data[i][4] = d.getAddress(); data[i][5] = themeMoney(d.getTotalDonated());
-        }
-        TableHelper.setData(table, data);
+    private void clearForm() {
+        txtName.setText("");
+        txtEmail.setText("");
+        txtPhone.setText("");
+        txtAddress.setText("");
+        editingId = null;
+        table.clearSelection();
+        formTitle.setText("Add donor");
+        btnSave.setText("Add donor");
+        btnDelete.setEnabled(false);
+    }
+
+    private static String text(Object o) {
+        return o == null ? "" : o.toString();
     }
 }

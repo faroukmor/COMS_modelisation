@@ -1,195 +1,169 @@
 package com.charity.view;
 
+import com.charity.controller.AppController;
+import com.charity.model.Distribution;
+import com.charity.model.Donation;
+import com.charity.model.Donor;
+import com.charity.model.RequestStatus;
 import java.awt.BorderLayout;
-import java.awt.Color;
 import java.awt.Dimension;
-import java.awt.FlowLayout;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
 import java.awt.GridLayout;
+import java.awt.RenderingHints;
 import java.math.BigDecimal;
-import java.text.NumberFormat;
+import java.math.RoundingMode;
+import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
-import javax.swing.BorderFactory;
+import java.util.Map;
+import javax.swing.JButton;
+import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
-import javax.swing.JScrollPane;
-import javax.swing.border.EmptyBorder;
 import javax.swing.JTable;
-import com.charity.controller.AppController;
-import com.charity.model.Donation;
-import com.charity.model.Distribution;
-import com.charity.model.RequestStatus;
 
 /**
  * Administrator dashboard: key financial/operational cards and recent activity tables.
  */
-public class DashboardView extends JPanel {
+public class DashboardView extends BaseView {
     private static final long serialVersionUID = 1L;
-    private final AppController app;
-    private final NumberFormat money = NumberFormat.getCurrencyInstance(new Locale("ar", "DZ"));
 
-    private JLabel lblConfirmed, lblDistributed, lblBalance;
-    private JLabel lblDonors, lblBeneficiaries, lblPending;
+    private record Snapshot(BigDecimal confirmed, BigDecimal distributed, BigDecimal balance,
+                            int donors, int beneficiaries, int pending,
+                            List<Donation> donations, List<Distribution> distributions,
+                            Map<Long, String> donorNames) {
+    }
+
+    private final StatCard cConfirmed = new StatCard("Confirmed donations", Icons.Kind.ARROW_DOWN, Theme.GREEN, Theme.GREEN_LIGHT);
+    private final StatCard cDistributed = new StatCard("Distributed funds", Icons.Kind.ARROW_UP, Theme.RED, Theme.RED_LIGHT);
+    private final StatCard cBalance = new StatCard("Available balance", Icons.Kind.WALLET, Theme.GREEN_DARK, Theme.GREEN_LIGHT);
+    private final StatCard cDonors = new StatCard("Donors", Icons.Kind.HEART, Theme.BLUE, Theme.BLUE_LIGHT);
+    private final StatCard cBeneficiaries = new StatCard("Beneficiaries", Icons.Kind.USERS, Theme.BLUE, Theme.BLUE_LIGHT);
+    private final StatCard cPending = new StatCard("Pending aid requests", Icons.Kind.CLOCK, Theme.AMBER, Theme.AMBER_LIGHT);
+    private final UtilisationBar bar = new UtilisationBar();
+    private final JTable donationsTable = TableHelper.createTable(new String[]{"Date", "Donor", "Amount", "Status"});
+    private final JTable distributionsTable = TableHelper.createTable(new String[]{"Date", "Request", "Amount", "Method"});
 
     public DashboardView(AppController app) {
-        this.app = app;
-        setBackground(Theme.BG);
-        setLayout(new BorderLayout(0, 16));
-        setBorder(new EmptyBorder(0, 0, 0, 0));
+        super(app);
+        JButton refresh = UI.button("Refresh", UI.Style.SECONDARY, Icons.Kind.REFRESH);
+        refresh.addActionListener(e -> refresh());
+        String name = app.getCurrentUser() == null ? "" : ", " + app.getCurrentUser().getFullName();
+        add(UI.pageHeader("Dashboard", "Welcome back" + name + ". Here is where the fund stands today.", refresh),
+                BorderLayout.NORTH);
 
-        JLabel title = new JLabel("Administrator Dashboard");
-        title.setFont(Theme.TITLE_FONT);
-        title.setForeground(Theme.TEXT_DARK);
-        title.setBorder(new EmptyBorder(0, 0, 14, 0));
-        add(title, BorderLayout.NORTH);
+        JPanel stats = new JPanel(new GridLayout(2, 3, 16, 16));
+        stats.setOpaque(false);
+        for (StatCard c : new StatCard[]{cConfirmed, cDistributed, cBalance, cDonors, cBeneficiaries, cPending}) {
+            stats.add(c);
+        }
+        stats.setPreferredSize(new Dimension(100, 240));
 
-        add(buildCards(), BorderLayout.CENTER);
-        add(buildRecentActivity(), BorderLayout.SOUTH);
+        JPanel tables = new JPanel(new GridLayout(1, 2, 16, 0));
+        tables.setOpaque(false);
+        tables.add(TableHelper.tableCard("Recent donations", donationsTable, null));
+        tables.add(TableHelper.tableCard("Recent distributions", distributionsTable, null));
 
+        JPanel top = new JPanel(new BorderLayout(0, 16));
+        top.setOpaque(false);
+        top.add(stats, BorderLayout.NORTH);
+        top.add(bar, BorderLayout.SOUTH);
+
+        JPanel center = new JPanel(new BorderLayout(0, 16));
+        center.setOpaque(false);
+        center.add(top, BorderLayout.NORTH);
+        center.add(tables, BorderLayout.CENTER);
+        add(center, BorderLayout.CENTER);
         refresh();
     }
 
-    private JPanel buildCards() {
-        JPanel panel = new JPanel(new GridLayout(2, 3, 12, 12));
-        panel.setBackground(Theme.BG);
-        panel.setBorder(new EmptyBorder(0, 0, 14, 0));
-
-        lblConfirmed = valueLabel("0.00");
-        lblDistributed = valueLabel("0.00");
-        lblBalance = valueLabel("0.00");
-        lblDonors = valueLabel("0");
-        lblBeneficiaries = valueLabel("0");
-        lblPending = valueLabel("0");
-
-        panel.add(card("Total Confirmed Donations", lblConfirmed, Theme.GREEN));
-        panel.add(card("Total Distributed Funds", lblDistributed, Theme.RED));
-        panel.add(card("Available Balance", lblBalance, Theme.GREEN_DARK));
-        panel.add(card("Total Donors", lblDonors, Theme.BLUE));
-        panel.add(card("Total Beneficiaries", lblBeneficiaries, Theme.BLUE));
-        panel.add(card("Pending Aid Requests", lblPending, Theme.AMBER));
-        return panel;
-    }
-
-    private JLabel valueLabel(String text) {
-        JLabel v = new JLabel(text);
-        v.setFont(Theme.CARD_VALUE);
-        v.setForeground(Theme.TEXT_DARK);
-        return v;
-    }
-
-    private JPanel card(String label, JLabel value, Color accent) {
-        JPanel c = new JPanel();
-        c.setBackground(Theme.SURFACE);
-        c.setLayout(new BorderLayout());
-        c.setBorder(new EmptyBorder(14, 14, 14, 14));
-        c.setPreferredSize(new Dimension(200, 130));
-
-        JPanel top = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
-        top.setBackground(accent);
-        top.setBorder(new EmptyBorder(10, 12, 10, 12));
-        JLabel tag = new JLabel(label);
-        tag.setFont(Theme.CARD_LABEL);
-        tag.setForeground(Color.WHITE);
-        top.add(tag);
-
-        JPanel bottom = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
-        bottom.setBackground(Theme.SURFACE);
-        bottom.setBorder(new EmptyBorder(14, 14, 14, 14));
-        bottom.add(value);
-
-        c.add(top, BorderLayout.NORTH);
-        c.add(bottom, BorderLayout.CENTER);
-        return c;
-    }
-
-    private JPanel buildRecentActivity() {
-        JPanel panel = new JPanel(new BorderLayout(12, 0));
-        panel.setBackground(Theme.BG);
-
-        JLabel title = new JLabel("Recent Activity");
-        title.setFont(Theme.H2_FONT);
-        title.setForeground(Theme.TEXT_DARK);
-        title.setBorder(new EmptyBorder(0, 0, 10, 0));
-        panel.add(title, BorderLayout.NORTH);
-
-        JPanel tables = new JPanel(new GridLayout(1, 2, 12, 0));
-        tables.setBackground(Theme.BG);
-        List<Donation> donations = app.getDonationDAO().findAll();
-        List<Distribution> distributions = app.getDistributionDAO().findAll();
-        tables.add(recentTable("Recent Donations",
-                new String[]{"Date", "Donor", "Amount", "Status"},
-                donationRows(donations)));
-        tables.add(recentTable("Recent Distributions",
-                new String[]{"Date", "Request #", "Amount", "Method"},
-                distributionRows(distributions)));
-        panel.add(tables, BorderLayout.CENTER);
-        return panel;
-    }
-
-    private JPanel recentTable(String title, String[] columns, Object[][] rows) {
-        JPanel panel = new JPanel(new BorderLayout());
-        panel.setBackground(Theme.SURFACE);
-        panel.setBorder(Theme.CARD_BORDER);
-
-        JLabel t = new JLabel(title);
-        t.setFont(Theme.H3_FONT);
-        t.setForeground(Theme.TEXT_DARK);
-        t.setBorder(new EmptyBorder(12, 12, 8, 12));
-        panel.add(t, BorderLayout.NORTH);
-
-        JTable table = TableHelper.createTable(columns);
-        TableHelper.setData(table, rows);
-        JScrollPane scroll = new JScrollPane(table);
-        scroll.setBorder(BorderFactory.createEmptyBorder());
-        scroll.getViewport().setBackground(Theme.SURFACE);
-        panel.add(scroll, BorderLayout.CENTER);
-        return panel;
-    }
-
-    private Object[][] donationRows(List<Donation> list) {
-        int n = Math.min(list.size(), 5);
-        Object[][] data = new Object[n][4];
-        for (int i = 0; i < n; i++) {
-            Donation d = list.get(i);
-            data[i][0] = d.getDonationDate() != null ? d.getDonationDate().toString() : "";
-            data[i][1] = "Donor #" + d.getDonorId();
-            data[i][2] = formatMoney(d.getAmount());
-            data[i][3] = d.getStatus();
-        }
-        return data;
-    }
-
-    private Object[][] distributionRows(List<Distribution> list) {
-        int n = Math.min(list.size(), 5);
-        Object[][] data = new Object[n][4];
-        for (int i = 0; i < n; i++) {
-            Distribution d = list.get(i);
-            data[i][0] = d.getDistributionDate() != null ? d.getDistributionDate().toString() : "";
-            data[i][1] = "Req #" + d.getAidRequestId();
-            data[i][2] = formatMoney(d.getAmount());
-            data[i][3] = d.getPaymentMethod();
-        }
-        return data;
-    }
-
     public void refresh() {
-        BigDecimal confirmed = app.financialService.getTotalConfirmedDonations();
-        BigDecimal distributed = app.financialService.getTotalDistributed();
-        BigDecimal balance = app.financialService.getAvailableBalance();
-
-        lblConfirmed.setText(formatMoney(confirmed));
-        lblDistributed.setText(formatMoney(distributed));
-        lblBalance.setText(formatMoney(balance));
-        lblBalance.setForeground(balance.signum() < 0 ? Theme.RED : Theme.GREEN_DARK);
-
-        lblDonors.setText(String.valueOf(app.getDonorDAO().findAll().size()));
-        lblBeneficiaries.setText(String.valueOf(app.getBeneficiaryDAO().findAll().size()));
-        int pending = app.getRequestDAO().countByStatus(RequestStatus.PENDING);
-        lblPending.setText(String.valueOf(pending));
+        async(() -> {
+            BigDecimal confirmed = app.financialService.getTotalConfirmedDonations();
+            BigDecimal distributed = app.financialService.getTotalDistributed();
+            List<Donor> donors = app.donorService.findAll();
+            Map<Long, String> names = new HashMap<>();
+            donors.forEach(d -> names.put(d.getId(), d.getFullName()));
+            return new Snapshot(confirmed, distributed, confirmed.subtract(distributed),
+                    donors.size(), app.beneficiaryService.findAll().size(),
+                    app.getRequestDAO().countByStatus(RequestStatus.PENDING),
+                    app.getDonationDAO().findAll(), app.getDistributionDAO().findAll(), names);
+        }, this::show);
     }
 
-    private String formatMoney(BigDecimal amount) {
-        if (amount == null) amount = BigDecimal.ZERO;
-        return money.format(amount);
+    private void show(Snapshot s) {
+        cConfirmed.setValue(Format.money(s.confirmed()));
+        cDistributed.setValue(Format.money(s.distributed()));
+        cBalance.setValue(Format.money(s.balance()));
+        cBalance.setValueColor(s.balance().signum() < 0 ? Theme.RED : Theme.GREEN_DARK);
+        cDonors.setValue(String.valueOf(s.donors()));
+        cBeneficiaries.setValue(String.valueOf(s.beneficiaries()));
+        cPending.setValue(String.valueOf(s.pending()));
+        bar.set(s.confirmed(), s.distributed());
+
+        int n = Math.min(5, s.donations().size());
+        Object[][] d = new Object[n][4];
+        for (int i = 0; i < n; i++) {
+            Donation x = s.donations().get(i);
+            d[i] = new Object[]{x.getDonationDate(), s.donorNames().getOrDefault(x.getDonorId(), "Donor #" + x.getDonorId()),
+                    x.getAmount(), x.getStatus()};
+        }
+        TableHelper.setData(donationsTable, d);
+
+        int m = Math.min(5, s.distributions().size());
+        Object[][] r = new Object[m][4];
+        for (int i = 0; i < m; i++) {
+            Distribution x = s.distributions().get(i);
+            r[i] = new Object[]{x.getDistributionDate(), "Request #" + x.getAidRequestId(), x.getAmount(), x.getPaymentMethod()};
+        }
+        TableHelper.setData(distributionsTable, r);
+        donationsTable.getColumnModel().getColumn(0).setMaxWidth(Integer.MAX_VALUE);
+        distributionsTable.getColumnModel().getColumn(0).setMaxWidth(Integer.MAX_VALUE);
+    }
+
+    /** "How much of the confirmed money has already been given out" progress bar. */
+    private static final class UtilisationBar extends UI.Card {
+        private static final long serialVersionUID = 1L;
+        private double ratio;
+        private final JLabel caption = UI.label("Fund utilisation", Theme.H3_FONT, Theme.TEXT_DARK);
+        private final JLabel percent = UI.label("0%", Theme.H3_FONT, Theme.GREEN_DARK);
+
+        UtilisationBar() {
+            padding(16, 22);
+            JPanel row = new JPanel(new BorderLayout());
+            row.setOpaque(false);
+            row.add(caption, BorderLayout.WEST);
+            row.add(percent, BorderLayout.EAST);
+            JComponent track = new JComponent() {
+                private static final long serialVersionUID = 1L;
+
+                @Override
+                protected void paintComponent(Graphics g) {
+                    Graphics2D g2 = (Graphics2D) g.create();
+                    g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                    int h = 10;
+                    int y = (getHeight() - h) / 2;
+                    g2.setColor(Theme.SLATE_LIGHT);
+                    g2.fillRoundRect(0, y, getWidth(), h, h, h);
+                    int w = (int) Math.round(getWidth() * Math.max(0, Math.min(1, ratio)));
+                    if (w > 0) {
+                        g2.setColor(ratio > 0.9 ? Theme.AMBER : Theme.GREEN);
+                        g2.fillRoundRect(0, y, Math.max(w, h), h, h, h);
+                    }
+                    g2.dispose();
+                }
+            };
+            track.setPreferredSize(new Dimension(100, 22));
+            setLayout(new BorderLayout(0, 6));
+            add(row, BorderLayout.NORTH);
+            add(track, BorderLayout.CENTER);
+        }
+
+        void set(BigDecimal confirmed, BigDecimal distributed) {
+            ratio = confirmed.signum() <= 0 ? 0
+                    : distributed.divide(confirmed, 4, RoundingMode.HALF_UP).doubleValue();
+            percent.setText(Math.round(ratio * 100) + "% of confirmed donations distributed");
+            repaint();
+        }
     }
 }

@@ -1,159 +1,133 @@
 package com.charity.view;
 
+import com.charity.controller.AppController;
+import com.charity.model.AidRequest;
+import com.charity.model.Beneficiary;
+import com.charity.model.Distribution;
+import com.charity.model.PaymentMethod;
+import com.charity.model.RequestStatus;
 import java.awt.BorderLayout;
-import java.awt.Color;
-import java.awt.Dimension;
-import java.awt.FlowLayout;
-import java.awt.GridLayout;
 import java.math.BigDecimal;
+import java.util.HashMap;
 import java.util.List;
-import javax.swing.BorderFactory;
+import java.util.Map;
 import javax.swing.DefaultComboBoxModel;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JLabel;
-import javax.swing.JOptionPane;
 import javax.swing.JPanel;
-import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.JTextField;
-import javax.swing.border.EmptyBorder;
-import com.charity.controller.AppController;
-import com.charity.model.Distribution;
-import com.charity.model.PaymentMethod;
 
 /**
  * Financial distributions: disburse aid against approved requests and view history.
  */
-public class DistributionView extends JPanel {
+public class DistributionView extends BaseView {
     private static final long serialVersionUID = 1L;
-    private final AppController app;
     private final JTable table = TableHelper.createTable(
-            new String[]{"ID", "Request #", "Beneficiary #", "Amount", "Date", "Method", "Reference"});
-    private final JTextField txtRequestId = new JTextField();
-    private final JTextField txtAmount = new JTextField();
-    private final JComboBox<PaymentMethod> cmbMethod = new JComboBox<>(new DefaultComboBoxModel<>(PaymentMethod.values()));
-    private final JTextField txtReference = new JTextField();
-    private final JTextField txtDescription = new JTextField();
+            new String[]{"ID", "Request", "Beneficiary", "Amount", "Date", "Method", "Reference"});
+    private final JComboBox<Item> cmbRequest = UI.styleCombo(new JComboBox<>());
+    private final JTextField txtAmount = UI.styleField(new JTextField(), "0.00");
+    private final JComboBox<PaymentMethod> cmbMethod = UI.enumCombo(PaymentMethod.values());
+    private final JTextField txtReference = UI.styleField(new JTextField());
+    private final JTextField txtDescription = UI.styleField(new JTextField());
+    private final JTextField txtSearch = UI.searchField("Search distributions...");
+    private final JLabel balance = UI.label(" ", Theme.H2_FONT, Theme.GREEN_DARK);
+    private final Map<Long, BigDecimal> remaining = new HashMap<>();
 
     public DistributionView(AppController app) {
-        this.app = app;
-        setBackground(Theme.BG);
-        setLayout(new BorderLayout(0, 10));
-        setBorder(new EmptyBorder(16, 16, 16, 16));
-        add(buildForm(), BorderLayout.NORTH);
-        add(buildTable(), BorderLayout.CENTER);
+        super(app);
+        add(UI.pageHeader("Distributions", "Give approved aid to beneficiaries from the available balance.", txtSearch),
+                BorderLayout.NORTH);
+        TableHelper.attachFilter(table, txtSearch);
+        UI.Card list = TableHelper.tableCard("Distribution history", table, null);
+
+        UI.FormGrid g = new UI.FormGrid(1);
+        g.add("Approved request", cmbRequest);
+        g.add("Amount (DZD)", txtAmount);
+        g.add("Payment method", cmbMethod);
+        g.add("Reference", txtReference);
+        g.add("Description", txtDescription);
+        JPanel head = new JPanel(new BorderLayout(0, 2));
+        head.setOpaque(false);
+        head.add(UI.muted("Available balance"), BorderLayout.NORTH);
+        head.add(balance, BorderLayout.CENTER);
+        JPanel body = new JPanel(new BorderLayout(0, 16));
+        body.setOpaque(false);
+        body.add(head, BorderLayout.NORTH);
+        body.add(g, BorderLayout.CENTER);
+        JButton btn = UI.button("Disburse aid", UI.Style.PRIMARY, Icons.Kind.SEND);
+        btn.addActionListener(e -> onDisburse());
+        add(masterDetail(list, formCard(cardTitle("New distribution"), body, UI.buttonRow(btn)), 390), BorderLayout.CENTER);
+
+        cmbRequest.addActionListener(e -> {
+            Item it = (Item) cmbRequest.getSelectedItem();
+            if (it != null && remaining.containsKey(it.id())) {
+                txtAmount.setText(remaining.get(it.id()).stripTrailingZeros().toPlainString());
+            }
+        });
         load();
-        wireTable();
     }
 
-    private JPanel buildForm() {
-        JPanel outer = new JPanel(new BorderLayout());
-        outer.setBackground(Theme.BG);
-        outer.setBorder(new EmptyBorder(0, 0, 10, 0));
-        JLabel title = new JLabel("Disburse Financial Aid");
-        title.setFont(Theme.H2_FONT);
-        title.setForeground(Theme.TEXT_DARK);
-        outer.add(title, BorderLayout.NORTH);
-        JPanel form = new JPanel(new GridLayout(2, 6, 8, 8));
-        form.setBackground(Theme.SURFACE);
-        form.setBorder(Theme.CARD_BORDER);
-        form.add(field("Approved Request ID", txtRequestId));
-        form.add(field("Amount (DZD)", txtAmount));
-        form.add(combo("Payment Method", cmbMethod));
-        form.add(field("Reference", txtReference));
-        form.add(field("Description", txtDescription));
-        JPanel btns = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
-        btns.setBackground(Theme.SURFACE);
-        JButton btnDisburse = button("Disburse Aid", Theme.GREEN_DARK);
-        JButton btnRefresh = button("Refresh", Theme.TEXT_MUTED);
-        btnDisburse.addActionListener(e -> onDisburse());
-        btnRefresh.addActionListener(e -> load());
-        btns.add(btnDisburse); btns.add(btnRefresh);
-        form.add(btns);
-        outer.add(form, BorderLayout.CENTER);
-        return outer;
-    }
-
-    private JPanel field(String label, JTextField f) {
-        JPanel p = new JPanel(new BorderLayout(4, 4));
-        p.setBackground(Theme.SURFACE);
-        p.setBorder(new EmptyBorder(4, 4, 4, 4));
-        p.add(new JLabel(label), BorderLayout.NORTH);
-        p.add(f, BorderLayout.CENTER);
-        return p;
-    }
-
-    private JPanel combo(String label, JComboBox<?> c) {
-        JPanel p = new JPanel(new BorderLayout(4, 4));
-        p.setBackground(Theme.SURFACE);
-        p.setBorder(new EmptyBorder(4, 4, 4, 4));
-        p.add(new JLabel(label), BorderLayout.NORTH);
-        p.add(c, BorderLayout.CENTER);
-        return p;
-    }
-
-    private JButton button(String label, Color color) {
-        JButton b = new JButton(label);
-        b.setBackground(color);
-        b.setForeground(Color.WHITE);
-        b.setFont(Theme.BUTTON_FONT);
-        b.setFocusPainted(false);
-        b.setBorder(new EmptyBorder(8, 14, 8, 14));
-        return b;
-    }
-
-    private JPanel buildTable() {
-        JPanel outer = new JPanel(new BorderLayout());
-        outer.setBackground(Theme.BG);
-        outer.setBorder(new EmptyBorder(0, 0, 0, 0));
-        JLabel title = new JLabel("Distribution History");
-        title.setFont(Theme.H3_FONT);
-        title.setForeground(Theme.TEXT_DARK);
-        title.setBorder(new EmptyBorder(8, 0, 4, 0));
-        outer.add(title, BorderLayout.NORTH);
-        JScrollPane scroll = new JScrollPane(table);
-        scroll.getViewport().setBackground(Theme.SURFACE);
-        outer.add(scroll, BorderLayout.CENTER);
-        return outer;
+    private record Data(List<Distribution> distributions, List<AidRequest> approved,
+                        List<Beneficiary> beneficiaries, BigDecimal balance) {
     }
 
     private void load() {
-        List<Distribution> list = app.distributionService == null ? java.util.Collections.emptyList()
-                : app.getDistributionDAO().findAll();
-        Object[][] data = new Object[list.size()][7];
-        for (int i = 0; i < list.size(); i++) {
-            Distribution d = list.get(i);
-            data[i][0] = d.getId();
-            data[i][1] = d.getAidRequestId();
-            data[i][2] = d.getBeneficiaryId();
-            data[i][3] = money(d.getAmount());
-            data[i][4] = d.getDistributionDate() != null ? d.getDistributionDate().toString() : "";
-            data[i][5] = d.getPaymentMethod();
-            data[i][6] = d.getReference();
-        }
-        TableHelper.setData(table, data);
-    }
+        async(() -> new Data(app.getDistributionDAO().findAll(),
+                app.getRequestDAO().findByStatus(RequestStatus.APPROVED),
+                app.beneficiaryService.findAll(), app.financialService.getAvailableBalance()), data -> {
+            Map<Long, String> names = new HashMap<>();
+            data.beneficiaries().forEach(b -> names.put(b.getId(), b.getDisplayName()));
+            balance.setText(Format.money(data.balance()));
+            balance.setForeground(data.balance().signum() < 0 ? Theme.RED : Theme.GREEN_DARK);
 
-    private String money(BigDecimal v) { return v == null ? "0.00" : v.stripTrailingZeros().toString(); }
+            remaining.clear();
+            DefaultComboBoxModel<Item> model = new DefaultComboBoxModel<>();
+            for (AidRequest r : data.approved()) {
+                BigDecimal left = r.getRemainingAmount();
+                if (left.signum() > 0) {
+                    remaining.put(r.getId(), left);
+                    model.addElement(new Item(r.getId(), "#" + r.getId() + "  "
+                            + names.getOrDefault(r.getBeneficiaryId(), "Beneficiary #" + r.getBeneficiaryId())
+                            + "  -  " + Format.money(left) + " left"));
+                }
+            }
+            cmbRequest.setModel(model);
 
-    private void wireTable() {
-        table.getSelectionModel().addListSelectionListener(e -> {});
+            List<Distribution> list = data.distributions();
+            Object[][] rows = new Object[list.size()][];
+            for (int i = 0; i < list.size(); i++) {
+                Distribution d = list.get(i);
+                rows[i] = new Object[]{d.getId(), "Request #" + d.getAidRequestId(),
+                        names.getOrDefault(d.getBeneficiaryId(), "#" + d.getBeneficiaryId()),
+                        d.getAmount(), d.getDistributionDate(), d.getPaymentMethod(), d.getReference()};
+            }
+            TableHelper.setData(table, rows);
+        });
     }
 
     void onDisburse() {
-        try {
-            Long requestId = Long.valueOf(txtRequestId.getText().trim());
-            BigDecimal amount = new BigDecimal(txtAmount.getText().trim());
-            PaymentMethod method = (PaymentMethod) cmbMethod.getSelectedItem();
-            Long distId = app.distributionService.disburse(requestId, amount, method,
-                    txtReference.getText().trim(), txtDescription.getText().trim());
-            txtRequestId.setText(""); txtAmount.setText(""); txtReference.setText(""); txtDescription.setText("");
-            load();
-            JOptionPane.showMessageDialog(this, "Aid disbursed (distribution #" + distId + ").", "Success",
-                    JOptionPane.INFORMATION_MESSAGE);
-        } catch (Exception ex) {
-            JOptionPane.showMessageDialog(this, ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        Item req = (Item) cmbRequest.getSelectedItem();
+        if (req == null) {
+            toastError("There is no approved request waiting for a distribution.");
+            return;
         }
+        final BigDecimal amount;
+        try {
+            amount = Format.parseAmount(txtAmount.getText());
+        } catch (IllegalArgumentException ex) {
+            toastError(ex.getMessage());
+            return;
+        }
+        PaymentMethod method = (PaymentMethod) cmbMethod.getSelectedItem();
+        async(() -> app.distributionService.disburse(req.id(), amount, method,
+                txtReference.getText().trim(), txtDescription.getText().trim()), id -> {
+            toast("Aid disbursed (distribution #" + id + ").");
+            txtAmount.setText("");
+            txtReference.setText("");
+            txtDescription.setText("");
+            load();
+        });
     }
 }
