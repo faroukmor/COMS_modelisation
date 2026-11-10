@@ -20,11 +20,13 @@ public class FinancialService {
     }
 
     public BigDecimal getTotalConfirmedDonations() {
-        return donationDAO.totalConfirmedAmount() == null ? BigDecimal.ZERO : donationDAO.totalConfirmedAmount();
+        BigDecimal total = donationDAO.totalConfirmedAmount(); // one query, not two
+        return total == null ? BigDecimal.ZERO : total;
     }
 
     public BigDecimal getTotalDistributed() {
-        return distributionDAO.totalAmount() == null ? BigDecimal.ZERO : distributionDAO.totalAmount();
+        BigDecimal total = distributionDAO.totalAmount();
+        return total == null ? BigDecimal.ZERO : total;
     }
 
     /**
@@ -34,4 +36,3 @@ public class FinancialService {
         return getTotalConfirmedDonations().subtract(getTotalDistributed());
     }
 }
-

@@ -39,10 +39,11 @@ public class DistributionService {
         });
     }
 
-    DistributionService(AidRequestDAO requestDAO,
-                        DistributionDAO distributionDAO,
-                        DonationDAO donationDAO,
-                        Supplier<Connection> connectionSupplier) {
+    /** Injection point for the connection source (used by tests to run against another database). */
+    public DistributionService(AidRequestDAO requestDAO,
+                               DistributionDAO distributionDAO,
+                               DonationDAO donationDAO,
+                               Supplier<Connection> connectionSupplier) {
         this.requestDAO = requestDAO;
         this.distributionDAO = distributionDAO;
         this.donationDAO = donationDAO;
@@ -71,19 +72,22 @@ public class DistributionService {
             throw new IllegalStateException("Only approved requests can receive a distribution");
         }
 
+        BigDecimal approvedAmount = request.getApprovedAmount() == null ? BigDecimal.ZERO : request.getApprovedAmount();
+        BigDecimal alreadyDistributed = request.getDistributedAmount() == null
+                ? BigDecimal.ZERO : request.getDistributedAmount();
+
         // Rule: amount cannot exceed remaining approved amount
-        BigDecimal remaining = request.getApprovedAmount().subtract(request.getDistributedAmount());
+        BigDecimal remaining = approvedAmount.subtract(alreadyDistributed);
         if (amount.compareTo(remaining) > 0) {
             throw new IllegalArgumentException(
                     "Distribution amount exceeds remaining approved amount (" + remaining + ")");
         }
 
-        // Rule: amount cannot exceed available fund balance
-        BigDecimal available = donationDAO.totalConfirmedAmount()
-                .subtract(distributionDAO.totalAmount());
-        if (available == null) {
-            available = BigDecimal.ZERO;
-        }
+        // Rule: amount cannot exceed available fund balance (null-safe: an empty fund has no rows)
+        BigDecimal confirmed = donationDAO.totalConfirmedAmount();
+        BigDecimal distributed = distributionDAO.totalAmount();
+        BigDecimal available = (confirmed == null ? BigDecimal.ZERO : confirmed)
+                .subtract(distributed == null ? BigDecimal.ZERO : distributed);
         if (amount.compareTo(available) > 0) {
             throw new IllegalArgumentException(
                     "Distribution amount exceeds available fund balance (" + available + ")");
@@ -104,9 +108,9 @@ public class DistributionService {
             distribution.setDescription(description);
             Long distributionId = distributionDAO.save(distribution, con);
 
-            BigDecimal newDistributed = request.getDistributedAmount().add(amount);
+            BigDecimal newDistributed = alreadyDistributed.add(amount);
             request.setDistributedAmount(newDistributed);
-            if (newDistributed.compareTo(request.getApprovedAmount()) >= 0) {
+            if (newDistributed.compareTo(approvedAmount) >= 0) {
                 request.setStatus(RequestStatus.FULFILLED);
             }
             requestDAO.update(request, con);
@@ -119,6 +123,9 @@ public class DistributionService {
         } catch (SQLException e) {
             rollback(con);
             throw new RuntimeException("Database error during distribution", e);
+        } catch (RuntimeException e) {
+            rollback(con);
+            throw e;
         } finally {
             close(con);
         }
