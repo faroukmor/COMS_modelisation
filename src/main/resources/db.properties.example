@@ -6,8 +6,8 @@
 # ============================================================================
 
 # Oracle JDBC connection URL (thin driver)
-# Format: jdbc:oracle:thin:@//HOST:PORT/SERVICE_NAME
-db.url=jdbc:oracle:thin:@//localhost:1521/ORCLPDB1
+# Format: jdbc:oracle:thin:@HOST:PORT:SID  (Oracle 11g XE: SID is XE)  or  jdbc:oracle:thin:@//HOST:PORT/SERVICE_NAME
+db.url=jdbc:oracle:thin:@localhost:1521:XE
 
 # Database username
 db.username=charity_app

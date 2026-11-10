@@ -55,6 +55,14 @@
             <version>${flatlaf.version}</version>
         </dependency>
 
+        <!-- H2 in Oracle-compatibility mode: lets the tests run the real SQL scripts and JDBC DAOs without an Oracle server -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <version>2.2.224</version>
+            <scope>test</scope>
+        </dependency>
+
         <!-- JUnit 5 (test scope) -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
@@ -88,10 +96,19 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.3.1</version>
                 <configuration>
+                    <argLine>-Djava.awt.headless=true</argLine>
                     <includes>
                         <include>**/*Test.java</include>
                         <include>**/*Tests.java</include>
                     </includes>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.5.0</version>
+                <configuration>
+                    <mainClass>com.charity.view.CharityApp</mainClass>
                 </configuration>
             </plugin>
             <plugin>

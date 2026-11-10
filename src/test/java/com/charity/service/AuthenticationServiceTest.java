@@ -66,4 +66,42 @@ class AuthenticationServiceTest {
         assertFalse(service.isDonor(admin));
         assertFalse(service.isBeneficiary(admin));
     }
+
+    @Test
+    @DisplayName("username is case-insensitive and surrounding spaces are ignored")
+    void usernameNormalisation() {
+        assertNotNull(service.authenticate("ADMIN", "Admin123"));
+        assertNotNull(service.authenticate("  admin ", "Admin123"));
+    }
+
+    @Test
+    @DisplayName("null / blank credentials are rejected without exceptions")
+    void blankCredentials() {
+        assertNull(service.authenticate(null, "x"));
+        assertNull(service.authenticate("admin", null));
+        assertNull(service.authenticate("", "Admin123"));
+        assertNull(service.authenticate("admin", ""));
+        assertNull(service.authenticate("   ", "Admin123"));
+    }
+
+    @Test
+    @DisplayName("a user whose stored hash is corrupt simply cannot log in")
+    void corruptHash() {
+        User broken = new User();
+        broken.setUsername("broken");
+        broken.setPasswordHash("pbkdf2:sha256:250000$Zm9vYmFy$d4f3e2c1b0a9");
+        broken.setRole(Role.DONOR);
+        userDAO.save(broken);
+        assertNull(service.authenticate("broken", "anything1"));
+    }
+
+    @Test
+    @DisplayName("beneficiary and association accounts are both treated as beneficiaries")
+    void beneficiaryRoles() {
+        User b = new User(); b.setRole(Role.BENEFICIARY);
+        User a = new User(); a.setRole(Role.ASSOCIATION);
+        assertTrue(service.isBeneficiary(b));
+        assertTrue(service.isBeneficiary(a));
+        assertFalse(service.isBeneficiary(null));
+    }
 }

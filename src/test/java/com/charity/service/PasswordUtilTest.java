@@ -47,4 +47,35 @@ class PasswordUtilTest {
     void malformedHash() {
         assertFalse(PasswordUtil.verify("pass", "not-a-hash"));
     }
+
+    @Test
+    @DisplayName("verify honours the iteration count stored in the hash (not a hard-coded one)")
+    void honoursStoredIterations() throws Exception {
+        // hash produced elsewhere with only 1000 iterations must still verify
+        byte[] salt = "0123456789abcdef".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        javax.crypto.spec.PBEKeySpec spec = new javax.crypto.spec.PBEKeySpec("Legacy123".toCharArray(), salt, 1000, 256);
+        byte[] dk = javax.crypto.SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").generateSecret(spec).getEncoded();
+        String stored = "pbkdf2:sha256:1000$" + java.util.Base64.getEncoder().encodeToString(salt)
+                + "$" + java.util.Base64.getEncoder().encodeToString(dk);
+        assertTrue(PasswordUtil.verify("Legacy123", stored));
+        assertFalse(PasswordUtil.verify("Legacy124", stored));
+    }
+
+    @Test
+    @DisplayName("verify never throws on garbage (bad number, bad base64, wrong prefix, absurd iterations)")
+    void garbageNeverThrows() {
+        assertFalse(PasswordUtil.verify("x", "pbkdf2:sha256:abc$AAAA$AAAA"));
+        assertFalse(PasswordUtil.verify("x", "pbkdf2:sha256:1000$!!!$???"));
+        assertFalse(PasswordUtil.verify("x", "md5:1000$AAAA$AAAA"));
+        assertFalse(PasswordUtil.verify("x", "pbkdf2:sha256:2000000000$AAAA$AAAA"));
+        assertFalse(PasswordUtil.verify("x", "pbkdf2:sha256:0$AAAA$AAAA"));
+        assertFalse(PasswordUtil.verify("x", ""));
+    }
+
+    @Test
+    @DisplayName("hash rejects empty passwords")
+    void hashRejectsEmpty() {
+        assertThrows(IllegalArgumentException.class, () -> PasswordUtil.hash(""));
+        assertThrows(IllegalArgumentException.class, () -> PasswordUtil.hash(null));
+    }
 }

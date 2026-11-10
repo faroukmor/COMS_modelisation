@@ -30,7 +30,8 @@ public class FakeDonorDAO implements DonorDAO {
     public void delete(Long id) { donors.removeIf(d -> d.getId().equals(id)); }
     @Override
     public List<Donor> search(String keyword) {
-        String k = keyword.toLowerCase();
+        if (keyword == null || keyword.isBlank()) return findAll();
+        String k = keyword.trim().toLowerCase();
         return donors.stream().filter(d ->
                 d.getFullName().toLowerCase().contains(k) ||
                 (d.getEmail() != null && d.getEmail().toLowerCase().contains(k)))

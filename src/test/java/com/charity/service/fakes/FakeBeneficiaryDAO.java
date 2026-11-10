@@ -30,8 +30,11 @@ public class FakeBeneficiaryDAO implements BeneficiaryDAO {
     public void delete(Long id) { list.removeIf(b -> b.getId().equals(id)); }
     @Override
     public List<Beneficiary> search(String keyword) {
-        String k = keyword.toLowerCase();
-        return list.stream().filter(b -> b.getDisplayName().toLowerCase().contains(k)).toList();
+        // mirrors OracleBeneficiaryDAO: matches the display name or the e-mail, blank keyword = everything
+        if (keyword == null || keyword.isBlank()) return findAll();
+        String k = keyword.trim().toLowerCase();
+        return list.stream().filter(b -> b.getDisplayName().toLowerCase().contains(k)
+                || (b.getEmail() != null && b.getEmail().toLowerCase().contains(k))).toList();
     }
     @Override
     public List<Beneficiary> findByType(BeneficiaryType type) {

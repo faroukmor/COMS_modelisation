@@ -13,7 +13,7 @@ public class FakeUserDAO implements UserDAO {
     private final AtomicLong id = new AtomicLong(1);
     @Override
     public Optional<User> findByUsername(String username) {
-        return users.stream().filter(u -> u.getUsername().equals(username)).findFirst();
+        return users.stream().filter(u -> u.getUsername().equalsIgnoreCase(username)).findFirst();
     }
     @Override
     public Long save(User user) {
@@ -32,5 +32,11 @@ public class FakeUserDAO implements UserDAO {
     public boolean exists(String username) {
         return findByUsername(username).isPresent();
     }
-    public List<User> all() { return new ArrayList<>(users); }
+    @Override
+    public boolean emailExists(String email) {
+        return email != null && users.stream().anyMatch(u -> email.equalsIgnoreCase(u.getEmail()));
+    }
+    @Override
+    public List<User> findAll() { return new ArrayList<>(users); }
+    public List<User> all() { return findAll(); }
 }
