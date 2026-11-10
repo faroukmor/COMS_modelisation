@@ -12,8 +12,10 @@ import com.charity.dao.OracleDonationDAO;
 import com.charity.dao.OracleDonorDAO;
 import com.charity.dao.OracleUserDAO;
 import com.charity.dao.UserDAO;
+import com.charity.model.Role;
 import com.charity.model.User;
 import com.charity.service.AuthenticationService;
+import com.charity.service.UserService;
 import com.charity.service.BeneficiaryService;
 import com.charity.service.DonationService;
 import com.charity.service.DonorService;
@@ -21,6 +23,8 @@ import com.charity.service.FinancialService;
 import com.charity.service.DistributionService;
 import com.charity.view.ReportView;
 import com.charity.service.AidRequestService;
+import java.util.function.Supplier;
+import javax.swing.JComponent;
 
 import com.charity.view.DashboardView;
 import com.charity.view.DistributionView;
@@ -29,6 +33,8 @@ import com.charity.view.LoginView;
 import com.charity.view.MainFrame;
 import com.charity.view.AidRequestView;
 import com.charity.view.BeneficiaryView;
+import com.charity.view.PortalView;
+import com.charity.view.UsersView;
 import com.charity.view.DonationView;
 
 /**
@@ -48,6 +54,7 @@ public class AppController {
 
     // Services
     public final AuthenticationService authService = new AuthenticationService(userDAO);
+    public final UserService userService = new UserService(userDAO, donorDAO, beneficiaryDAO);
     public final DonorService donorService = new DonorService(donorDAO);
     public final BeneficiaryService beneficiaryService = new BeneficiaryService(beneficiaryDAO);
     public final DonationService donationService = new DonationService(donationDAO, donorDAO);
@@ -81,17 +88,27 @@ public class AppController {
         return authService.authenticate(username, password);
     }
 
+    /** Synchronous login (blocks on hashing and the database); the login screen uses a background thread. */
     public boolean login(String username, String password) {
         User user = authenticate(username, password);
         if (user == null) {
             return false;
         }
+        onLoggedIn(user);
+        return true;
+    }
+
+    /** Called once credentials were verified: opens the right home page for the user's role. */
+    public void onLoggedIn(User user) {
         currentUser = user;
         if (mainFrame != null) {
             mainFrame.setUser(user);
         }
-        showDashboard();
-        return true;
+        if (authService.isAdmin(user)) {
+            showDashboard();
+        } else {
+            showPortal();
+        }
     }
 
     public void logout() {
@@ -99,55 +116,62 @@ public class AppController {
         if (mainFrame != null) {
             mainFrame.setUser(null);
         }
+        showLogin();
+    }
+
+    public void showLogin() {
+        if (mainFrame != null) {
+            mainFrame.showView("login", new LoginView(this));
+        }
+    }
+
+    // ---- navigation (administrator pages are refused for everybody else) ----
+
+    private void adminPage(String id, Supplier<JComponent> factory) {
+        if (mainFrame == null || currentUser == null || !authService.isAdmin(currentUser)) {
+            return;
+        }
+        mainFrame.showView(id, factory.get());
     }
 
     public void showDashboard() {
-        if (currentUser == null || !authService.isAdmin(currentUser)) {
-            return;
-        }
-        mainFrame.showView("dashboard", new DashboardView(this));
+        adminPage("dashboard", () -> new DashboardView(this));
     }
 
     public void showDonors() {
-        if (currentUser == null || !authService.isAdmin(currentUser)) {
-            return;
-        }
-        mainFrame.showView("donors", new DonorView(this));
+        adminPage("donors", () -> new DonorView(this));
     }
 
     public void showDonations() {
-        if (currentUser == null || !authService.isAdmin(currentUser)) {
-            return;
-        }
-        mainFrame.showView("donations", new DonationView(this));
+        adminPage("donations", () -> new DonationView(this));
     }
 
     public void showBeneficiaries() {
-        if (currentUser == null || !authService.isAdmin(currentUser)) {
-            return;
-        }
-        mainFrame.showView("beneficiaries", new BeneficiaryView(this));
+        adminPage("beneficiaries", () -> new BeneficiaryView(this));
     }
 
     public void showAidRequests() {
-        if (currentUser == null || !authService.isAdmin(currentUser)) {
-            return;
-        }
-        mainFrame.showView("aidrequests", new AidRequestView(this));
+        adminPage("aidrequests", () -> new AidRequestView(this));
     }
 
     public void showDistributions() {
-        if (currentUser == null || !authService.isAdmin(currentUser)) {
-            return;
-        }
-        mainFrame.showView("distributions", new DistributionView(this));
+        adminPage("distributions", () -> new DistributionView(this));
     }
 
     public void showReports() {
-        if (currentUser == null || !authService.isAdmin(currentUser)) {
+        adminPage("reports", () -> new ReportView(this));
+    }
+
+    public void showUsers() {
+        adminPage("users", () -> new UsersView(this));
+    }
+
+    /** Home page for donor / beneficiary / association accounts. */
+    public void showPortal() {
+        if (mainFrame == null || currentUser == null || currentUser.getRole() == Role.ADMIN) {
             return;
         }
-        mainFrame.showView("reports", new ReportView(this));
+        mainFrame.showView("portal", new PortalView(this));
     }
 
     // DAO access for views
