@@ -1,173 +1,197 @@
 # Charity Fund Management System
 
-## Project Overview
-Charity Fund Management System is a desktop application for managing a charitable organization's financial donations and distributions. Built as an academic Software Engineering project, it prioritizes clean architecture, maintainability, and usability.
+A desktop application (Java Swing) that lets a charitable organization record donations, manage beneficiaries, review aid requests and distribute funds, with the available balance always calculated from the recorded transactions.
 
-## Problem Statement
-The charitable organization needed a software system to replace manual processes for tracking donations, managing beneficiaries, and distributing financial aid. Previously, the organization relied on spreadsheets and paper records, which led to difficulty in tracking donation history, calculating available funds, managing aid requests, and generating reports.
+> Built as an academic Software Engineering project. Data is stored in an Oracle database.
 
-## Project Objectives
-1. Register and manage donors with donation history tracking
-2. Record financial donations with proper status tracking
-3. Manage individual beneficiaries and charity associations
-4. Receive and review financial aid requests
-5. Approve or reject requests based on available funds
-6. Distribute approved financial aid with proper validation
-7. Monitor the organization's available financial balance
-8. Generate basic financial and operational reports
+## Features
 
-## Main Features
-- **Authentication**: Role-based login (ADMIN, DONOR, BENEFICIARY, ASSOCIATION) with public sign-up for donors, beneficiaries and associations; administrators can add any user (including other administrators) from the Users page
-- **Self-service portal**: donors see their donations and can donate; beneficiaries/associations see their aid requests and can submit new ones (account and profile are linked by e-mail)
-- **Donor Management**: Register, view, search, update donors
-- **Donation Recording**: Record donations (cash/bank transfer), confirm/cancel
-- **Beneficiary Management**: Individuals and charity associations
-- **Aid Requests**: Submit, review, approve/reject
-- **Financial Distributions**: Transactional disbursement with validation
-- **Dashboard**: Financial overview with cards and tables
-- **Reports**: CSV export of financial data
+| Area | What it does |
+|---|---|
+| **Sign-in & sign-up** | Role-based login. Visitors can create a Donor, Beneficiary or Association account from the login screen. Passwords are hashed with PBKDF2 (never stored in clear text). |
+| **Dashboard** (admin) | Confirmed donations, distributed funds, available balance, donor / beneficiary counts, pending requests, fund utilisation bar and recent activity. |
+| **Donors** | Add, edit, delete and filter donors. |
+| **Donations** | Record a donation (pending, or confirmed straight away), then confirm or cancel it. Only confirmed donations count toward the balance. |
+| **Beneficiaries** | Individuals and charity associations, each with its own required fields. |
+| **Aid requests** | Submit requests; an administrator approves (with an amount), rejects or marks them under review. |
+| **Distributions** | Pay out approved aid. Each payout is one database transaction and is rolled back completely on any failure. |
+| **Reports** | Financial summary and full history, live filter, export to CSV (opens correctly in Excel). |
+| **Users** (admin) | List all accounts and add new users of any role, including other administrators. |
+| **My Account** (donor / beneficiary / association) | A donor sees their donations and can donate; a beneficiary or association sees their requests and can submit new ones. |
 
-## Six Primary Use Cases
-1. Authenticate User
-2. Manage Donors
-3. Record Donations
-4. Manage Beneficiaries
-5. Manage Aid Requests
-6. Disburse Financial Aid
+### Roles
 
-## Technology Stack
-- **Language**: Java (JDK 24)
-- **Build**: Maven 3.9.11
-- **GUI**: Java Swing + FlatLaf (modern charitable green theme)
-- **Database**: Oracle Database (11g XE or later)
-- **JDBC**: Standard JDBC connectivity
-- **Testing**: JUnit 5
+- **ADMIN**: all pages above.
+- **DONOR**: *My Account* only (own donations, make a donation).
+- **BENEFICIARY / ASSOCIATION**: *My Account* only (own aid requests, submit a request).
 
-## Technology Stack Details
-- **FlatLaf 3.6.2**: Modern LookAndFeel with charitable green palette
-- **Oracle JDBC driver**: ojdbc8 from Maven Central
-- **JUnit 5.10.2**: Unit testing framework
-- **PBKDF2WithHmacSHA256**: Password hashing for security
+A donor / beneficiary account is linked to its record by **e-mail address**. Signing up creates both the account and the record; an e-mail that already exists in the system cannot be reused for a new account.
 
-## Actors and Roles
-- **Administrator**: Full access to all features (manage donors, record donations, review requests, distribute funds, access dashboards)
-- **Donor**: Can record donations and view donation history
-- **Beneficiary**: Can submit aid requests and track status
+### Business rules enforced by the code
 
-## Six Primary Use Cases
-1. Authenticate User
-2. Manage Donors
-3. Record Donations
-4. Manage Beneficiaries
-5. Manage Aid Requests
-6. Disburse Financial Aid
+- Available balance = confirmed donations − distributed funds (never edited by hand).
+- A donation must have a positive amount and an existing donor; a confirmed donation cannot be cancelled.
+- A donor's `total donated` only grows when a donation is **confirmed**.
+- Aid can only be distributed for an **approved** request, never more than the approved amount still remaining, and never more than the available balance. The request becomes *Fulfilled* once fully paid.
+- Password policy: at least 8 characters, with at least one letter and one digit. Usernames are 3–30 characters (letters, digits, `.`, `_`, `-`) and case-insensitive.
 
-The dashboard and basic reports are interface features, not additional primary Use Cases.
+## Technology
 
-## Technology Stack
-- **Programming Language**: Java (JDK 24)
-- **Build Tool**: Apache Maven 3.9.11
-- **GUI**: Java Swing with FlatLaf styling
-- **Database**: Oracle Database (11g XE or later)
-- **Database Connectivity**: JDBC
-- **Testing**: JUnit 5
+- Java **24** (JDK), Maven **3.9+**
+- Swing with [FlatLaf](https://www.formdev.com/flatlaf/) 3.6.2 and custom-painted components
+- Oracle Database **11g XE or later** via the `ojdbc8` driver (plain JDBC, no ORM)
+- JUnit 5 and H2 (in Oracle compatibility mode) for the tests
 
-## Software Architecture
-The application follows a layered architecture with clear separation of responsibilities:
+## Getting started
 
-### Model Layer
-Contains domain entities: User, Donor, Beneficiary, Individual, CharityAssociation, Donation, AidRequest, Distribution.
+The application needs an Oracle database, so cloning the repository is not enough: the database and a small configuration file must be set up once.
 
-### DAO Layer
-Handles database operations using JDBC with prepared statements to prevent SQL injection.
+### What you need installed
 
-### Service Layer
-Contains business logic and validation for all financial rules and operations.
+1. **JDK 24** (`java -version`)
+2. **Maven** (`mvn -version`)
+3. **Oracle Database** (11g XE or later) with the SQL*Plus tool
 
-### Controller Layer
-Connects the GUI with the service layer, handling user interactions.
+### 1. Get the code
 
-### View Layer
-Contains Swing screens, dialogs, forms, tables, and dashboard components.
-
-### Database Layer
-Handles database connections and configuration with Oracle SQL scripts.
-
-## Project Directory Structure
 ```
-COMS_modelisation/
-├── src/main/java/com/charity/model/          # Domain entities (8 classes)
-├── src/main/java/com/charity/dao/            # Data access objects (12 files)
-├── src/main/java/com/charity/service/        # Business logic (7 services)
-├── src/main/java/com/charity/controller/     # Application controller (2 classes)
-├── src/main/java/com/charity/view/           # Swing UI (15+ windows)
-├── src/main/java/com/charity/util/           # Utilities (Password hashing)
-├── src/test/java/com/charity/service/        # JUnit 5 tests (15 classes)
-├── src/main/resources/database/              # SQL schema and sample data
-├── pom.xml                                   # Maven configuration
-├── README.md                                 # Project overview
-└── document.md                               # Detailed documentation
+git clone <repository-url>
+cd COMS_modelisation
 ```
 
-## Installation Instructions
-1. Ensure Java JDK 24 is installed
-2. Ensure Apache Maven 3.9.11 is installed
-3. Install Oracle Database (11g XE or later)
-4. As SYSTEM run `create_user.sql` (creates the `charity_app` user), then connect as `charity_app` and run `schema.sql` to create the tables, sequences and triggers (`drop_all.sql` removes them again)
-5. Run `sample_data.sql` to insert the default admin account and sample records (the script ends with `COMMIT`)
-6. Copy `src/main/resources/db.properties.example` to `src/main/resources/db.properties` and set your Oracle connection details (any value can also be overridden with `-Ddb.url=... -Ddb.username=... -Ddb.password=...`)
-7. Compile with `mvn compile`
-8. Run with `mvn compile exec:java`
+### 2. Create the database user (once)
 
-## Default Login Credentials
-- **Username**: admin
-- **Password**: Admin123
-- **Role**: ADMIN (full access to all features)
+Open a terminal and connect as the database administrator:
 
-## Screenshots
-*(Screenshots would show the GUI interface - placeholder for demo)*
+```
+sqlplus system
+```
 
-## Testing Instructions
-Run all tests: `mvn test`
-Run specific test: `mvn test -Dtest=AidRequestServiceTest`
-The suite (100+ tests) has three layers:
-- service unit tests using in-memory fakes (business rules, validation, sign-up, authentication);
-- integration tests that run the real `schema.sql`, `sample_data.sql` and the real JDBC DAOs on an in-memory H2 database in Oracle-compatibility mode (SQL scripts, constraints, transactions/rollback, end-to-end money flow);
-- UI tests that drive the real screens without opening a window (buttons are clicked, results checked in the database).
-No Oracle server is needed to run `mvn test`.
+Then, inside `SQL>` (change the password if you like):
 
-## Known Limitations
-- Database: Oracle Database required (not H2/SQLite)
-- Desktop only: No web or mobile support
-- Single organization: Designed for one charitable organization
-- No online payments: Does not implement real payment processing
-- Password hashing: Tested in controlled environments
+```sql
+CREATE USER charity_app IDENTIFIED BY "Charity_123" DEFAULT TABLESPACE users QUOTA UNLIMITED ON users;
+GRANT CREATE SESSION, CREATE TABLE, CREATE SEQUENCE, CREATE TRIGGER TO charity_app;
+EXIT;
+```
 
-## Future Improvements
-- PDF report generation with charts
-- Email notifications for status changes
-- Advanced search and filtering
-- Enhanced audit logging
-- Database backup/restore functionality
+(The same statements are in `src/main/resources/database/create_user.sql`.)
 
-## Development Commits
-The project follows meaningful commits:
-1. chore: initialize Maven Java project
-2. docs: add project overview and initial README
-3. feat: implement domain models
-4. feat: implement MySQL database schema and connection
-5. feat: implement DAO layer
-6. feat: implement authentication and role management
-7. feat: implement donor management
-8. feat: implement donation management
-9. feat: implement beneficiary management
-10. feat: implement aid request management
-11. feat: implement financial distribution logic
-12. feat: implement administrator dashboard
-13. feat: implement reports
-14. style: improve GUI and user experience
-15. test: add unit and integration tests
-16. docs: complete README and setup instructions
+### 3. Create the tables and sample data (once)
 
-## Summary
-The Charity Fund Management System is a complete, functional desktop application for managing a charitable organization's financial operations. It demonstrates proper software engineering practices with clean architecture, maintainable code, and comprehensive testing covering all six primary use cases.
+Go to the scripts folder and connect as the new user:
+
+```
+cd src/main/resources/database
+sqlplus charity_app
+```
+
+```sql
+@schema.sql
+@sample_data.sql
+```
+
+Expected: `Sequence created`, `Table created`, `Index created`, `Trigger created`, then `1 row created` repeatedly and `Commit complete`, with **no** `ERROR` lines. Quick check (should print `1 3 4 4 4 2`):
+
+```sql
+SELECT (SELECT COUNT(*) FROM users) u, (SELECT COUNT(*) FROM donors) d,
+       (SELECT COUNT(*) FROM beneficiaries) b, (SELECT COUNT(*) FROM donations) dn,
+       (SELECT COUNT(*) FROM aid_requests) r, (SELECT COUNT(*) FROM distributions) ds FROM dual;
+```
+
+To start over from scratch, run `@drop_all.sql` first (errors about missing objects are harmless).
+
+### 4. Tell the application how to connect
+
+Copy the example file and edit it. The real `db.properties` is in `.gitignore`, so your password is never committed.
+
+```
+cd ../../../..            # back to the project root
+copy src\main\resources\db.properties.example src\main\resources\db.properties      (Windows)
+cp   src/main/resources/db.properties.example src/main/resources/db.properties      (Linux / macOS)
+```
+
+```properties
+db.url=jdbc:oracle:thin:@localhost:1521:XE
+db.username=charity_app
+db.password=Charity_123
+```
+
+`db.url` formats: `jdbc:oracle:thin:@HOST:PORT:SID` (Oracle 11g XE: SID is `XE`) or `jdbc:oracle:thin:@//HOST:PORT/SERVICE_NAME` (newer versions, e.g. `XEPDB1` / `FREEPDB1`). Any value can also be overridden from the command line, e.g. `-Ddb.password=...`.
+
+### 5. Run
+
+```
+mvn clean compile exec:java
+```
+
+Sign in with the default administrator below. Whenever you change `db.properties`, rebuild (`mvn clean compile`) so the new file is copied to the classpath.
+
+### Default login
+
+| Username | Password | Role |
+|---|---|---|
+| `admin` | `Admin123` | Administrator |
+
+Create your own administrator from **Users → Add user**, and use a strong password for any real deployment. The sample donors, beneficiaries, donations and requests exist only to try the application; you can delete them.
+
+## Running the tests
+
+```
+mvn test
+```
+
+No Oracle server is needed. The suite (100+ tests) has three layers:
+
+1. **Service unit tests** with in-memory fakes: business rules, validation, sign-up, authentication.
+2. **Integration tests** that run the real `schema.sql`, `sample_data.sql` and the real JDBC DAOs on an in-memory H2 database in Oracle mode: constraints, ids from sequences, transactions and rollback, the full money flow.
+3. **UI tests** that drive the real screens without opening a window: buttons are clicked and the result is checked in the database.
+
+H2 does not enforce every Oracle rule, so a few Oracle-specific rules are checked directly by tests (for example: identifiers of at most 30 characters, no `IDENTITY` columns, `DEFAULT` before `NOT NULL`).
+
+## Troubleshooting
+
+| Message | Cause and fix |
+|---|---|
+| `db.properties was not found` | Create `src/main/resources/db.properties` (step 4) and rebuild. |
+| `ORA-12514` / `Listener refused the connection` | Wrong service name or SID in `db.url`. For 11g XE use `...@localhost:1521:XE`. Check that the Oracle service is running. |
+| `ORA-01017 invalid username/password` | `db.username` / `db.password` do not match the user you created in step 2. |
+| `ORA-00942 table or view does not exist` | The scripts were not run as `charity_app`, or `schema.sql` failed part-way. Run `drop_all.sql`, then `schema.sql` and `sample_data.sql` again, and read the output for `ERROR` lines. |
+| `ORA-28000 account is locked` | `ALTER USER charity_app ACCOUNT UNLOCK;` as `system`. |
+| Authentication / protocol error with correct credentials | Set `<ojdbc.version>` in `pom.xml` to `19.3.0.0` and rebuild (better match for 11g). |
+
+## Project structure
+
+```
+src/main/java/com/charity/
+  model/        entities and enums (User, Donor, Donation, AidRequest, Distribution, Role, ...)
+  dao/          DAO interfaces and Oracle JDBC implementations
+  service/      business rules (AuthenticationService, UserService, DonationService, DistributionService, ...)
+  controller/   AppController: wires the layers together and handles navigation / sign-in
+  view/         Swing screens, theme and reusable components
+  database/     connection and configuration (db.properties / -D overrides)
+  util/         password hashing and input validation
+src/main/resources/
+  db.properties.example     connection settings template
+  database/                 create_user.sql, schema.sql, sample_data.sql, drop_all.sql
+src/test/java/com/charity/
+  service/  integration/  view/    the three test layers described above
+```
+
+Layers only depend downward: `view → controller → service → dao → database`. Money movements go through `DistributionService`, which opens one transaction for the distribution row and the request update.
+
+## Known limitations
+
+- **No e-mail verification.** The link between an account and its donor / beneficiary record is the e-mail address, which is why an already-registered e-mail is refused at sign-up.
+- No password reset or change-password screen yet; an administrator can create a new account.
+- One currency (DZD) and one general fund; no per-campaign funds.
+- The balance check is not locked against two administrators disbursing at the same instant.
+- Each database call opens a new connection (no connection pool), which is fine for a small desktop deployment.
+- Tested automatically on H2 (Oracle mode) and by hand on Oracle 11g XE; other Oracle versions should work but are not part of the automated suite.
+
+## Possible improvements
+
+- Change-password and "forgot password" flows
+- Connection pooling and row locking for disbursements
+- PDF reports and date-range filters
+- Multiple funds / campaigns
